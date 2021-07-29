@@ -1,16 +1,12 @@
-# Download Daily Gage Data
+# Plot the Data
 
 # LIBRARIES ---------------------------------------------------------------
 
-library(dataRetrieval)
-library(sf)
 library(tidyverse)
-library(mapview)
-library(purrr)
 library(lubridate)
 library(glue)
-#library(tidylog)
 library(ggdark)
+#library(tidylog)
 
 # GET SITES ---------------------------------------------------------------
 
@@ -97,6 +93,7 @@ usgs_flows_meta %>% filter(site_no %in% gages$gageid[30:41]) %>%
 # single gage
 g1 <- usgs_flows_meta %>% filter(site_no %in% gages$gageid[20])
 
+# full POR
 ggplot(data=g1) +
   geom_line(aes(x=Date, 
                 #y=Flow,
@@ -109,3 +106,18 @@ ggplot(data=g1) +
 
 # save
 #ggsave(filename = "figs/hydrographs_highly_alt_gageids_1-20.png", width = 11, height = 8.5, dpi=300)
+
+# create a version with a zoom year
+zoomYr <- 1988
+
+# full POR
+ggplot(data=g1) +
+  geom_line(aes(x=Date, 
+                y=Flow,
+                #y=log(Flow), 
+                group=site_no, color=site_no), show.legend = F) +
+  labs(subtitle = glue("USGS {g1$site_no}: {g1$station_nm}")) +
+  theme_classic(base_family = "Roboto Condensed", base_size = 9) +
+  scale_color_viridis_d() + labs(y="Flow (cfs)", x="") +
+  theme(axis.text.x = element_text(angle=90, hjust = 1)) +
+  ggforce::facet_zoom(x = lubridate::year(g1$Date) == zoomYr, shrink=T)
