@@ -6,26 +6,19 @@ library(tidyverse)
 library(lubridate)
 library(glue)
 library(ggdark)
-#library(tidylog)
+library(tidylog)
 
 # GET SITES ---------------------------------------------------------------
 
-# load data
-all_gages <- read_csv("data/list_of_all_gages_w_ffmdat.csv")
-
 # get metadata
-usgs_meta <- read_csv("data/usgs_metadata_all_gages.csv")
-
-table(all_gages$refgage)
-
-# unique? (n=748)
-length(unique(all_gages$gageid))
-
-gages <- all_gages %>% filter(refgage=="Non-Ref")
+usgs_alt <- read_csv("data/usgs_metadata_alt_gages.csv")
+usgs_ref <- read_csv("data/usgs_metadata_ref_gages.csv") %>% 
+  mutate(site_id = as.character(site_id))
 
 # Get Data ----------------------------------------------------------------
 
-load("data/usgs_Q_daily_all_gages.rda")
+load("data/usgs_Q_daily_alt_gages.rda")
+load("data/usgs_Q_daily_ref_gages.rda")
 
 # filter to just ref
 usgs_flows_meta <- usgs_flows %>% 

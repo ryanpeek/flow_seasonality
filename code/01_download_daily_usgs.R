@@ -130,17 +130,17 @@ ggplot() +
 # usgs_day600 <- usgs_day %>% dataRetrieval::addWaterYear()
 # usgs_day700 <- usgs_day %>% dataRetrieval::addWaterYear()
 # 
-# usgs_flows <- bind_rows(usgs_day100, usgs_day200, usgs_day300, usgs_day400,
+# usgs_flows_alt <- bind_rows(usgs_day100, usgs_day200, usgs_day300, usgs_day400,
 #                         usgs_day500, usgs_day600, usgs_day700) %>% 
 #   dataRetrieval::renameNWISColumns()
 
 # Save Out ----------------------------------------------------------------
 
 # write out as compressed (.gz, bz2, or xz (lzma)): 
-# write_csv(usgs_flows, file = "data/usgs_Q_daily_alt_gages.csv.xz")
+# write_csv(usgs_flows_alt, file = "data/usgs_Q_daily_alt_gages.csv.xz")
 
 # save as rda compressed:
-# save(usgs_flows, file = "data/usgs_Q_daily_alt_gages.rda", compress = "xz")
+# save(usgs_flows_alt, file = "data/usgs_Q_daily_alt_gages.rda", compress = "xz")
 
 # Download Ref Data -------------------------------------------------------
 
