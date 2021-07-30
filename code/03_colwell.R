@@ -1,7 +1,7 @@
 # Colwells
 
 library(hydrostats)
-library(tsbox)
+#library(tsbox)
 library(tidyverse)
 library(purrr)
 library(lubridate)
@@ -12,32 +12,28 @@ library(ggdark)
 # GET SITES ---------------------------------------------------------------
 
 # get metadata
-usgs_meta <- read_csv("data/usgs_metadata_all_gages.csv") %>% 
+usgs_alt <- read_csv("data/usgs_metadata_alt_gages.csv") %>% 
   rename(site_no=site_id)
-
-# ref gages:
-gages_ref <- read_csv("https://raw.githubusercontent.com/ryanpeek/ffm_comparison/main/data/usgs_gages_ref_223.txt", col_names = "site_no", col_types = "c") %>% 
-  mutate(gagetype="REF")
-
-# any in other list?
-table(gages_ref$site_no %in% usgs_meta$site_no)
-
-# NOPE!
+usgs_ref <- read_csv("data/usgs_metadata_ref_gages.csv") %>% 
+  rename(site_no = site_id) %>% 
+  mutate(site_no = as.character(site_no))
 
 # Get Data ----------------------------------------------------------------
 
-load("data/usgs_Q_daily_all_gages.rda")
+load("data/usgs_Q_daily_alt_gages.rda")
+load("data/usgs_Q_daily_ref_gages.rda")
 
-# filter to just ref
-usgs_flows_meta <- usgs_flows %>% 
+# filter and join
+usgs_flows_alt <- usgs_flows_alt %>% 
   select(-agency_cd) %>% 
-  left_join(., usgs_meta, by=c("site_no"="site_id"))
+  left_join(., usgs_alt, by=c("site_no"))
+usgs_flows_ref <- usgs_flows_ref %>% 
+  select(-agency_cd) %>% 
+  left_join(., usgs_ref, by=c("site_no"))
 
-gages_list <- usgs_flows_meta %>% 
-  select(site_no) %>% distinct()
-
-# rm usgs_flows
-rm(usgs_flows)
+# distinct_gage_lists
+gage_alt_distinct <- usgs_flows_alt %>% distinct(site_no)
+gage_ref_distinct <- usgs_flows_ref %>% distinct(site_no)
 
 # CALCULATE COLWELL -------------------------------------------------------
 
@@ -47,7 +43,7 @@ rm(usgs_flows)
 ## we divided (M) by overall predictability (the sum of (M) and constancy (C)
 
 # standardize
-df <- usgs_flows_meta %>%   
+df_ref <- usgs_flows_ref %>%   
   rename("Q"=Flow) %>% 
   select(Date, Q, site_no) %>% 
   mutate(Date = ymd(as.character(Date), tz = "US/Pacific")) %>% 
@@ -57,44 +53,64 @@ df <- usgs_flows_meta %>%
   map(., ~as.data.frame(.x)) 
 
 # calc colwells and add ID
-df_colwell <- df %>% 
+df_colwell_ref <- df_ref %>% 
   map(., ~hydrostats::Colwells(.x)) %>% 
   map(., ~tibble(MP_metric=c(.x[["MP"]]))) %>%
   bind_rows() %>% 
-  mutate(site_no = gages_list$site_no)
+  mutate(site_no = gage_ref_distinct$site_no)
 
-summary(df_colwell)
+# standardize
+df_alt <- usgs_flows_alt %>%   
+  rename("Q"=Flow) %>% 
+  select(Date, Q, site_no) %>% 
+  mutate(Date = ymd(as.character(Date), tz = "US/Pacific")) %>% 
+  group_by(site_no) %>% 
+  group_split() %>%
+  #.[1:30] %>% # extract
+  map(., ~as.data.frame(.x)) 
+
+# calc colwells and add ID
+df_colwell_alt <- df_alt %>% 
+  map(., ~hydrostats::Colwells(.x)) %>% 
+  map(., ~tibble(MP_metric=c(.x[["MP"]]))) %>%
+  bind_rows() %>% 
+  mutate(site_no = gage_alt_distinct$site_no)
+
+summary(df_colwell_alt)
+summary(df_colwell_ref)
 
 # JOIN WITH META ----------------------------------------------------------
 
-df_colwell_meta <- df_colwell %>% left_join(., usgs_meta, by=c("site_no"="site_id"))
+df_colwell_alt_meta <- df_colwell_alt %>% left_join(., usgs_alt, by=c("site_no"))
+df_colwell_ref_meta <- df_colwell_ref %>% left_join(., usgs_ref, by=c("site_no"))
 
-# load data w ref?
-all_gages <- read_csv("data/list_of_all_gages_w_ffmdat.csv")
-
-df_colwell_meta <- df_colwell_meta %>% left_join(., all_gages, by=c("site_no"="gageid"))
+# bind together
+df_colwell_all <- bind_rows(df_colwell_alt_meta, df_colwell_ref_meta)
+table(df_colwell_all$gagetype)
 
 # PLOTS --------------------------------------------------------------------
 
-df_colwell_meta %>% ggplot() + geom_histogram(aes(y=MP_metric))
+df_colwell_all %>% ggplot() + geom_histogram(aes(y=MP_metric, fill=gagetype))
 
-df_colwell_meta %>% 
+df_colwell_all %>% 
   ggplot() + 
-  geom_point(aes(x=as.factor(huc8), y=MP_metric, fill=alt_va), pch=21, size=4) +
-  theme_classic(base_family = "Roboto Condensed")+
-  scale_fill_viridis_c()
-
-df_colwell_meta %>% 
-  ggplot() + 
-  geom_boxplot(aes(y=MP_metric, x=refgage, fill=refgage)) +
+  geom_point(aes(x=as.factor(huc8), y=MP_metric, fill=gagetype), pch=21, size=4) +
   theme_classic(base_family = "Roboto Condensed")+
   scale_fill_viridis_d()
 
+df_colwell_all %>% 
+  ggplot() + 
+  geom_jitter(aes(y=MP_metric, x=gagetype), color="gray20", alpha=0.5) +
+  geom_boxplot(aes(y=MP_metric, x=gagetype, fill=gagetype), lwd=0.75, alpha=0.85, color="black") +
+  theme_classic(base_family = "Roboto Condensed")+
+  scale_fill_viridis_d(option = "A", "Gage Type") +
+  labs(y="Seasonality (Colwell's M/P)", x="",
+       caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)")
 
+ggsave(filename = "figures/boxplot_colwells_ref_alt.png", width = 10, height = 8, dpi = 300, units = "in")
 
 # SAVE --------------------------------------------------------------------
 
 # save
-write_rds(df_colwell, file = "output/usgs_gages_colwell.rds")
-
+write_rds(df_colwell_all, file = "output/usgs_gages_colwells_metric.rds")
 

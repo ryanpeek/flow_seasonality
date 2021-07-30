@@ -98,6 +98,9 @@ plotly::ggplotly(ggplot() + geom_line(data=usgs_ref_filt, aes(x=Date, y=Flow, gr
 # 11113000, Sespe Ck, start at 1927-10-01, missing 1985-10-01 to 1990-10-01
 # 11095500, Big Tujunga C, dam went in 1931, truncate 1931-10-01, ALT/reg after, truncated spill
 # 11082000, WF San Gabriel, below dam that went in 1932, some flattening but largely natural?
+# 10340500, Prosser Crk, dam went in 1959-1962, truncate 1962-10-01, through current ALT
+# 10308783, Leviathan Ck, largely flatlined at nearly zero
+# 10291500, Buckeye Ck, truncate (start at) 1953-10-01 to 1979-10-01, starts again 1995
 
 # INTERMITTENT?
 # 11274500, INTERMITTENT, Orestimba Ck goes dry (zero) most years
@@ -117,6 +120,14 @@ plotly::ggplotly(ggplot() + geom_line(data=usgs_ref_filt, aes(x=Date, y=Flow, gr
 # 11063000, Cajon flatlined
 # 11037700, Pauma Valley
 # 11033000, WF San Luis Rey R, flatlined, 1913-1915, then 1956-10-01 to 1986
+# 11031500, Agua Caliente goes to zero in many years
+# 10281800, Little Rock Ck, truncates 1977-09-30, goes to zero at times
+# 10259200, Deep Ck, goes to zero freq
+# 10258500, Palm Cnyn, gaps starting 1941 to 1947, zero freq
+# 10258000, TAHQUITZ Ck, zero freq
+# 10257600, Mission Ck, zero freq
+# 10257500, Falls Ck, zero freq, truncates at 1931, then 1994-10-01 to 2021
+
 
 
 
@@ -124,5 +135,6 @@ plotly::ggplotly(ggplot() + geom_line(data=usgs_ref_filt, aes(x=Date, y=Flow, gr
 # 11418000, ENGLEBRIGHT, needs to be moved to ALT data
 # 11406999, FEATHER RIVER AT OROVILLE needs to be moved to ALT data
 # 11294500, long record, NF Stan at Avery, but ALT??
+
 
 

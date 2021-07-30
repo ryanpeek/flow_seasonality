@@ -20,39 +20,29 @@ usgs_ref <- read_csv("data/usgs_metadata_ref_gages.csv") %>%
 load("data/usgs_Q_daily_alt_gages.rda")
 load("data/usgs_Q_daily_ref_gages.rda")
 
-# filter to just ref
-usgs_flows_meta <- usgs_flows %>% 
-  filter(site_no %in% gages$gageid) %>% 
-  select(-agency_cd) %>% 
-  left_join(., usgs_meta, by=c("site_no"="site_id"))
+# how many have data?
+usgs_flows_alt %>% distinct(site_no) %>% tally() # n=748
+usgs_flows_ref %>% distinct(site_no) %>% tally() # n=219
 
-length(unique(usgs_flows_meta$site_no))
 
-# rm usgs_flows
-rm(usgs_flows)
+# Join With Metadata ------------------------------------------------------
 
-# VISUALIZE DATE RANGES FOR SITES -----------------------------------------
+usgs_flows_alt_meta <- usgs_flows_alt %>% 
+  left_join(., usgs_alt, by=c("site_no"="site_id"))
 
-# visualize the stations to see date ranges
-ggplot() + 
-  geom_linerange(data=usgs_meta, 
-                 aes(x=forcats::fct_reorder(site_id, huc8), ymin=yr_begin, ymax=yr_end, color=as.factor(huc8)), size=1.1, show.legend = F) + 
-  coord_flip() + 
-  labs(x="", y="") + 
-  scale_color_viridis_d(option = "D") +
-  ggdark::dark_theme_bw(base_family = "Roboto Condensed", base_size = 8)
+usgs_flows_ref_meta <- usgs_flows_ref %>% 
+  left_join(., usgs_ref, by=c("site_no"="site_id"))
 
-# ggsave(filename = "figures/usgs_gage_year_ranges.jpg",
-#        width=11, height = 8.5, units = "in", dpi=300)
 
-#ggsave(filename = "figures/usgs_gages_year_ranges.pdf", 
-#       width=11, height = 8.5, units = "in", device = cairo_pdf)
+# Bind All ----------------------------------------------------------------
+
+# usgs_flows <- bind_rows(usgs_flows_alt_meta, usgs_flows_ref_meta) # 17.2 mill. rows!
 
 # Visualize Flow Data -----------------------------------------------------
 
 # expects x and y to be date and temp, but specify col name in quotes
-plot_gage_facet <- function(data, x, y, facetid, plotly=FALSE){
-  if(plotly == TRUE){
+plot_gage_facet <- function(data, x, y, facetid, logged=FALSE, plotly=FALSE){
+  if(plotly == TRUE & logged == FALSE){
     p1 <- ggplot() +
       geom_line(data=data,
                 aes(x=.data[[x]], y=.data[[y]],
@@ -65,7 +55,33 @@ plot_gage_facet <- function(data, x, y, facetid, plotly=FALSE){
     cat("Plotly it is!")
     return(plotly::ggplotly(p1))
   }
-  p2 <- ggplot() +
+  if(plotly == TRUE & logged==TRUE){
+    p2 <- ggplot() +
+      geom_line(data=data,
+                aes(x=.data[[x]], y=log(.data[[y]]),
+                    group=.data[[facetid]], color=.data[[facetid]]),
+                show.legend = F) +
+      theme_classic(base_family = "Roboto Condensed", base_size = 9) +
+      scale_color_viridis_d() + labs(y="log(Flow) (cfs)", x="") +
+      theme(axis.text.x = element_text(angle=90, hjust = 1)) +
+      facet_wrap(.~.data[[facetid]], scales= "free_x")
+    cat("Plotly it is!")
+    return(plotly::ggplotly(p2))
+  }
+  if(logged==TRUE & plotly == FALSE){
+    p3 <- ggplot() +
+      geom_line(data=data,
+                aes(x=.data[[x]], y=log(.data[[y]]),
+                    group=.data[[facetid]], color=.data[[facetid]]),
+                show.legend = F) +
+      theme_classic(base_family = "Roboto Condensed", base_size = 9) +
+      scale_color_viridis_d() + labs(y="log(Flow) (cfs)", x="") +
+      theme(axis.text.x = element_text(angle=90, hjust = 1)) +
+      facet_wrap(.~.data[[facetid]], scales= "free")
+    cat("printing static ggplots...")
+    return(print(p3))
+  }
+  p4 <- ggplot() +
     geom_line(data=data,
               aes(x=.data[[x]], y=.data[[y]],
                   group=.data[[facetid]], color=.data[[facetid]]),
@@ -75,26 +91,27 @@ plot_gage_facet <- function(data, x, y, facetid, plotly=FALSE){
     theme(axis.text.x = element_text(angle=90, hjust = 1)) +
     facet_wrap(.~.data[[facetid]], scales= "free")
   cat("printing static ggplots...")
-  return(print(p2))
+  return(print(p4))
 }
 
 # get list of gages and facet plot
-usgs_flows_meta %>% filter(site_no %in% gages$gageid[30:41]) %>% 
-  plot_gage_facet(., x="Date", y="Flow", 
-                  facetid = "site_no", plotly = F)
+usgs_flows_ref_meta %>% filter(site_no %in% usgs_ref$site_id[1:12]) %>% 
+  plot_gage_facet(., x="Date", y="Flow", logged = TRUE,
+                  facetid = "site_no", plotly = T)
 
 # single gage
-g1 <- usgs_flows_meta %>% filter(site_no %in% gages$gageid[20])
+g1 <- usgs_flows_ref_meta %>% filter(site_no %in% usgs_ref$site_id[2])
 
 # full POR
 ggplot(data=g1) +
   geom_line(aes(x=Date, 
-                #y=Flow,
-                y=log(Flow), 
+                y=Flow,
+                #y=log(Flow), 
                 group=site_no, color=site_no), show.legend = F) +
   labs(subtitle = glue("USGS {g1$site_no}: {g1$station_nm}")) +
   theme_classic(base_family = "Roboto Condensed", base_size = 9) +
-  scale_color_viridis_d() + labs(y="Flow (cfs)", x="") +
+  scale_color_viridis_d() + 
+  labs(y="Flow (cfs)", x="") +
   theme(axis.text.x = element_text(angle=90, hjust = 1))
 
 # save
