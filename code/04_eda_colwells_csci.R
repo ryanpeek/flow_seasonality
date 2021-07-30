@@ -139,6 +139,8 @@ plotly::ggplotly(ggplot() + geom_line(data=usgs_ref_filt, aes(x=Date, y=Flow, gr
 
 # Now Fix! ----------------------------------------------------------------
 
+### CREATE SPREADSHEET WITH GAGE, ALT/REF, DATE TO TRUNCATE BY, and then plug into purrr::filter?
+
 library(magrittr)
 
 # pull out ALT sites to relabel
@@ -209,11 +211,36 @@ alt_11341400 <- usgs_ref_filt %>% filter(site_no == "11341400") %>%
 ggplot(alt_11341400) + geom_line(aes(x=Date, y=Flow), color="steelblue")
 
 # 11208000, truncate after 2002-10-01
+usgs_ref_filt %>% filter(site_no == "11208000") %>% 
+  ggplot(.) + geom_line(aes(x=Date, y=Flow), color="steelblue")
 
+ref_11208000 <- usgs_ref_filt %>% filter(site_no == "11208000") %>% 
+  filter(Date < ymd("2002-10-01"))
+ggplot(ref_11208000) + geom_line(aes(x=Date, y=Flow), color="steelblue")
 
-# 11169800, truncate after 1982-10-01, then starts again in 2004-10-01 thru current
+alt_11208000 <- usgs_ref_filt %>% filter(site_no == "11208000") %>% 
+  filter(Date >= ymd("2002-10-01"))
+ggplot(alt_11208000) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+# 11169800, gap from 1982-10-01 to 2004-10-01, then thru current
+# usgs_ref_filt %>% filter(site_no == "11169800") %>% 
+#   ggplot(.) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+# 
+# ref_11169800 <- usgs_ref_filt %>% filter(site_no == "11169800") %>% 
+#   filter(Date < ymd("1982-10-01"))
+# ggplot(ref_11169800) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
 # 11113000, Sespe Ck, start at 1927-10-01, missing 1985-10-01 to 1990-10-01
+usgs_ref_filt %>% filter(site_no == "11113000") %>% 
+  ggplot(.) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+ref_11113000 <- usgs_ref_filt %>% filter(site_no == "11113000") %>% 
+  filter(Date >= ymd("1927-10-01"))
+ggplot(ref_11113000) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
 # 11095500, Big Tujunga C, dam went in 1931, truncate 1931-10-01, ALT/reg after, truncated spill
+
+
 # 11082000, WF San Gabriel, below dam that went in 1932, some flattening but largely natural?
 # 10340500, Prosser Crk, dam went in 1959-1962, truncate 1962-10-01, through current ALT
 # 10308783, Leviathan Ck, largely flatlined at nearly zero
