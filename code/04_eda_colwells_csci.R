@@ -2,6 +2,7 @@
 
 library(tidyverse)
 library(glue)
+library(lubridate)
 library(tidylog)
 library(ggdark)
 library(sf)
@@ -83,7 +84,10 @@ usgs_ref_filt <- usgs_flows_ref %>%
 plotly::ggplotly(ggplot() + geom_line(data=usgs_ref_filt, aes(x=Date, y=Flow, group=site_no, color=site_no), lwd=0.3, 
                      show.legend = FALSE))
 
-# NOTES
+
+# NOTES TO EDIT -----------------------------------------------------------
+
+## FIX
 # 11529000, truncate after 1967-09-29
 # 11526500, start 1957-02-13, end 1980-09-29
 # 11525500, truncate after 1960-10-01
@@ -128,13 +132,89 @@ plotly::ggplotly(ggplot() + geom_line(data=usgs_ref_filt, aes(x=Date, y=Flow, gr
 # 10257600, Mission Ck, zero freq
 # 10257500, Falls Ck, zero freq, truncates at 1931, then 1994-10-01 to 2021
 
-
-
-
 # DROP/SWITCH?
 # 11418000, ENGLEBRIGHT, needs to be moved to ALT data
 # 11406999, FEATHER RIVER AT OROVILLE needs to be moved to ALT data
 # 11294500, long record, NF Stan at Avery, but ALT??
 
+# Now Fix! ----------------------------------------------------------------
+
+library(magrittr)
+
+# pull out ALT sites to relabel
+usgs_ref_to_alt <- usgs_ref_filt %>% 
+  filter(site_no %in% c("11418000","11406999","11294500")) %>% 
+  mutate(gagetype = "ALT")
+
+# now work individually to make updates:
+
+# 11526500, start 1957-02-13, end 1980-09-29
+ref_11526500 <- usgs_ref_filt %>% filter(site_no == "11526500") %>% 
+  filter(Date > ymd("1957-02-13") & Date < ymd("1980-09-30"))
+ggplot(ref_11526500) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+# 11529000, truncate after 1967-09-29
+ref_11529000 <- usgs_ref_filt %>% filter(site_no == "11529000") %>% 
+  filter(Date < ymd("1967-09-30"))
+  
+ggplot(ref_11529000) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+# 11525500, truncate after 1960
+ref_11525500 <- usgs_ref_filt %>% filter(site_no == "11525500") %>% 
+  filter(Date < ymd("1960-10-01"))
+
+ggplot(ref_11525500) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+# 11472900, truncate after 1975-10-01
+ref_11472900 <- usgs_ref_filt %>% filter(site_no == "11472900") %>% 
+  filter(Date < ymd("1975-10-01"))
+
+ggplot(ref_11472900) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+# 11467500, truncate after 1971-10-01
+ref_11467500 <- usgs_ref_filt %>% filter(site_no == "11467500") %>% 
+  filter(Date < ymd("1971-10-01"))
+
+ggplot(ref_11467500) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+# 11467200, start at 2003-10-01
+ref_11467200 <- usgs_ref_filt %>% filter(site_no == "11467200") %>% 
+  filter(Date < ymd("2003-10-01"))
+
+ggplot(ref_11467200) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+# 11445500, truncate after 1960-10-01 (SFA at lotus) (REF)
+usgs_ref_filt %>% filter(site_no == "11445500") %>% 
+  ggplot(.) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+ref_11445500 <- usgs_ref_filt %>% filter(site_no == "11445500") %>% 
+  filter(Date < ymd("1960-10-01"))
+
+ggplot(ref_11445500) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+alt_11445500 <- usgs_ref_filt %>% filter(site_no == "11445500") %>% 
+  filter(Date >= ymd("1960-10-01"))
+ggplot(alt_11445500) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+# 11341400, truncate after 1968-10-01
+usgs_ref_filt %>% filter(site_no == "11341400") %>% 
+  ggplot(.) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+ref_11341400 <- usgs_ref_filt %>% filter(site_no == "11341400") %>% 
+  filter(Date < ymd("1968-10-01"))
+ggplot(ref_11341400) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+alt_11341400 <- usgs_ref_filt %>% filter(site_no == "11341400") %>% 
+  filter(Date >= ymd("1968-10-01"))
+ggplot(alt_11341400) + geom_line(aes(x=Date, y=Flow), color="steelblue")
+
+# 11208000, truncate after 2002-10-01
 
 
+# 11169800, truncate after 1982-10-01, then starts again in 2004-10-01 thru current
+# 11113000, Sespe Ck, start at 1927-10-01, missing 1985-10-01 to 1990-10-01
+# 11095500, Big Tujunga C, dam went in 1931, truncate 1931-10-01, ALT/reg after, truncated spill
+# 11082000, WF San Gabriel, below dam that went in 1932, some flattening but largely natural?
+# 10340500, Prosser Crk, dam went in 1959-1962, truncate 1962-10-01, through current ALT
+# 10308783, Leviathan Ck, largely flatlined at nearly zero
+# 10291500, Buckeye Ck, truncate (start at) 1953-10-01 to 1979-10-01, starts again 1995
