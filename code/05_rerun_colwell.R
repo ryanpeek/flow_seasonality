@@ -252,3 +252,9 @@ df_final %>%
   labs(y="Seasonality (Colwell's M/P)", x="CSCI",
        caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)") +
   facet_wrap(.~CLASS_NAME)
+
+
+# Save out ----------------------------------------------------------------
+
+write_rds(df_final, file = "output/usgs_gages_colwells_w_streamclass_metric.rds")
+save(ceff_strmclass, file="output/eflows_streamclasses.rda", compress = "gzip")
