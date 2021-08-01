@@ -7,9 +7,11 @@ library(lubridate)
 library(glue)
 library(tidylog)
 library(ggdark)
+library(sf)
 
+# if already run, skip steps 01-07 , and start with 08
 
-# Import Data -------------------------------------------------------------
+# 01: Import Flow/GAGE Data -----------------------------------------------
 
 # flow data
 load("data/usgs_Q_daily_alt_gages.rda")
@@ -19,7 +21,7 @@ load("data/usgs_Q_daily_ref_gages.rda")
 alt_revised <- read_rds("output/alt_revised_gages.rds") %>% select(-gagetype)
 ref_revised <- read_rds("output/ref_revised_gages.rds")
 
-# GET SITES ---------------------------------------------------------------
+# 02: GET SITES -----------------------------------------------------------
 
 # get metadata
 alt_meta <- read_csv("data/usgs_metadata_alt_gages.csv") %>% 
@@ -31,7 +33,7 @@ ref_meta <- read_csv("data/usgs_metadata_ref_gages.csv") %>%
 # bind
 gage_metadat <- bind_rows(alt_meta, ref_meta)
 
-# Filter and Merge with Revised Data --------------------------------------
+# 03: Filter and Merge with Revised Data --------------------------------------
 
 # ALT REVISED
 flows_alt <- usgs_flows_alt %>% 
@@ -50,7 +52,7 @@ usgs_flows_ref %>% distinct(site_no) %>% tally()
 flows_ref %>% distinct(site_no) %>% tally()
 
 
-# Join with Metadata ------------------------------------------------------
+# 04: Join with Metadata ------------------------------------------------------
 
 # filter and join
 flows_alt_meta <- flows_alt %>% 
@@ -63,11 +65,11 @@ flows_ref_meta <- flows_ref %>%
   left_join(., gage_metadat, by=c("site_no"))
 
 # distinct_gage_lists
-(gage_alt_distinct <- flows_alt_meta %>% distinct(site_no))
-(gage_ref_distinct <- flows_ref_meta %>% distinct(site_no))
+gage_alt_distinct <- flows_alt_meta %>% distinct(site_no)
+gage_ref_distinct <- flows_ref_meta %>% distinct(site_no)
 
 
-# CALCULATE COLWELL -------------------------------------------------------
+# 05: CALCULATE COLWELL -------------------------------------------------------
 
 # quick colwell analysis of seasonality:
 ## From Tonkin et al 2017: M (Contingency) as metric of seasonality
@@ -117,7 +119,7 @@ summary(df_colwell_ref)
 df_colwell_all <- bind_rows(df_colwell_alt, df_colwell_ref)
 table(df_colwell_all$gagetype)
 
-# JOIN WITH META ----------------------------------------------------------
+# 06: JOIN WITH META ----------------------------------------------------------
 
 df_colwell_all_meta <- df_colwell_all %>% 
   left_join(., gage_metadat %>% select(-gagetype), by=c("site_no"))
@@ -125,7 +127,16 @@ df_colwell_all_meta <- df_colwell_all %>%
 
 table(df_colwell_all$gagetype)
 
-# PLOTS --------------------------------------------------------------------
+# 07: SAVE ------------------------------------------------------------------
+
+# save
+write_rds(df_colwell_all_meta, file = "output/usgs_gages_colwells_metric.rds")
+
+# 08: READ IN DATA ---------------------------------------------------------
+
+df_colwell_all_meta <- read_rds("output/usgs_gages_colwells_metric.rds")
+
+# 09: PLOTS -----------------------------------------------------------------
 
 # Histogram
 df_colwell_all %>% ggplot() + geom_histogram(aes(y=MP_metric, fill=gagetype))
@@ -140,7 +151,7 @@ df_colwell_all_meta %>%
   labs(y="Seasonality (Colwell's M/P)", x="",
        caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)")
 
-ggsave(filename = "figures/boxplot_colwells_ref_alt.png", width = 10, height = 8, dpi = 300, units = "in")
+#ggsave(filename = "figures/boxplot_colwells_ref_alt.png", width = 10, height = 8, dpi = 300, units = "in")
 
 # Notched Boxplot of ref/alt
 df_colwell_all_meta %>% 
@@ -152,16 +163,9 @@ df_colwell_all_meta %>%
   labs(y="Seasonality (Colwell's M/P)", x="",
        caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)")
 
-ggsave(filename = "figures/boxplot_notched_colwells_ref_alt.png", width = 10, height = 8, dpi = 300, units = "in")
+#ggsave(filename = "figures/boxplot_notched_colwells_ref_alt.png", width = 10, height = 8, dpi = 300, units = "in")
 
-
-# SAVE --------------------------------------------------------------------
-
-# save
-write_rds(df_colwell_all_meta, file = "output/usgs_gages_colwells_metric.rds")
-
-
-# BRING IN CSCI -----------------------------------------------------------
+# 10: BRING IN CSCI -------------------------------------------------------
 
 # only alt dataset with percentiles
 csci_alt <- read_rds("data/06_csci_por_trim_final_dataset.rds") %>% 
@@ -175,7 +179,7 @@ csci_por <- read_rds("data/04_selected_csci_ffm_por_trim.rds") %>%
   distinct(StationCode, SampleID, site_id, .keep_all=TRUE)
 table(csci_por$CEFF_type) # n=521 alt, n=192 REF
 
-# JOIN COLWELL AND CSCI ---------------------------------------------------
+# 11: JOIN COLWELL AND CSCI -----------------------------------------------
 
 # join w seasonality:
 csci_alt_colwell <- left_join(csci_alt, df_colwell_all_meta, by=c("site_id"="site_no")) %>%
@@ -188,12 +192,12 @@ csci_por_colwell <- left_join(csci_por, df_colwell_all_meta, by=c("site_id"="sit
 
 table(csci_por_colwell$gagetype)
 
+# 12: PLOTS ---------------------------------------------------------------
 
-# PLOTS -------------------------------------------------------------------
-
+# CSCI vs GAGETYPE
 csci_por_colwell %>% 
   ggplot() + 
-  geom_point(aes(y=MP_metric, x=csci, fill=gagetype), pch=21, alpha=0.5) +
+  geom_point(aes(y=MP_metric, x=csci, fill=gagetype), pch=21, size=2.7, alpha=0.9) +
   stat_smooth(aes(y=MP_metric, x=csci, color=gagetype), 
               method = "gam") +
   theme_classic(base_family = "Roboto Condensed") +
@@ -202,10 +206,49 @@ csci_por_colwell %>%
   labs(y="Seasonality (Colwell's M/P)", x="CSCI",
        caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)")
 
-
+# CSCI BY GAGETYPE FACETED
 csci_por_colwell %>% 
-  ggplot() + geom_point( aes(x=MP_metric, y=site_no)) +
-  geom_vline(xintercept = 0.5, color="maroon", lwd=2) +
-  theme_classic() +
-  theme(axis.text.y = element_blank())
+  ggplot() + 
+  geom_point(aes(y=MP_metric, x=csci, fill=gagetype), pch=21, size=2.7, alpha=0.9) +
+  geom_violin(aes(y=MP_metric, x=csci, fill=gagetype), alpha=0.7) +
+  theme_classic(base_family = "Roboto Condensed") +
+  scale_color_viridis_d(option = "B", "Gage Type") +
+  scale_fill_viridis_d(option = "A", "Gage Type") +
+  labs(y="Seasonality (Colwell's M/P)", x="CSCI",
+       caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)") +
+  facet_grid(.~gagetype)
 
+# 13: READ IN STREAM CLASSES --------------------------------------------------
+
+# streamclass data
+st_layers("data/eflows_final_classification_9CLASS/Final_Classification_9CLASS.shp")
+
+ceff_strmclass <- st_read("data/eflows_final_classification_9CLASS/Final_Classification_9CLASS.shp")
+st_crs(ceff_strmclass)
+
+# crosswalk
+strmclass_xwalk <- tibble("CLASS"=c(1,2,3,4,5,6,7,8,9), "CLASS_NAME"=c("snowmelt","high-volume snowmelt and rain", "low-volume snowmelt and rain", "winter storms","groundwater","perennial groundwater and rain","flashy, ephemeral rain","rain and seasonal groundwater","high elevation low precipitation"))
+
+# all ref gages?
+ceff_ref_gages <- st_read("data/eflows_final_ref_gages/Final_Reference_Gages.shp")
+st_crs(ceff_ref_gages)
+
+# JOIN with csci_por_colwell by COMID
+df_final <- left_join(csci_por_colwell, ceff_strmclass, by=c("comid_gage"="COMID"))
+
+# add streamclass name
+df_final <- left_join(df_final, strmclass_xwalk)
+
+# replot
+# CSCI vs GAGETYPE
+df_final %>% 
+  ggplot() + 
+  geom_point(aes(y=MP_metric, x=csci, fill=CLASS_NAME), pch=21, size=2.7, alpha=0.9) +
+  stat_smooth(aes(y=MP_metric, x=csci), color="black",  
+              method = "gam", se = FALSE) +
+  theme_classic(base_family = "Roboto Condensed") +
+  scale_color_viridis_d(option = "B", "Gage Type") +
+  scale_fill_viridis_d(option = "A", "StreamClass") +
+  labs(y="Seasonality (Colwell's M/P)", x="CSCI",
+       caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)") +
+  facet_wrap(.~CLASS_NAME)
