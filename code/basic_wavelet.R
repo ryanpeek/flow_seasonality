@@ -11,46 +11,39 @@ library(ggforce)
 library(ggrepel)
 library(dataRetrieval)
 library(sf)
+library(glue)
 
-# FUNCTIONS ---------------------------------------------------------------
+# Data --------------------------------------------------------------------
 
-source("scripts/f_dv_zoom.R")
+# flow data
+load("data/usgs_Q_daily_alt_gages.rda")
+load("data/usgs_Q_daily_ref_gages.rda")
 
+# WAVELET -----------------------------------------------------------------
 
-# Test --------------------------------------------------------------------
+GAGE <- unique(usgs_flows_ref$site_no) %>% as.data.frame %>% 
+  rename(site_no = 1) %>% slice(1)
+flowdat <- usgs_flows_ref %>% filter(site_no %in% GAGE$site_no)
+flowdat %>% ggplot() + geom_line(aes(x=Date, y=Flow))
 
-# USGS: NFA
+w1 <- analyze.wavelet(flowdat, my.series = 5, dt = 1/30) 
+# usgs flow is in col 5
+# monthly analysis here if days are base unit
 
-# at Shirttail
-# 11426500 (1911-1941)
-get_usgs_dv(gage = 11426500, site = "NFA", facetYr = 1934, filterYrs = F, savedat = T, saveplot = F)
-
-# at NF Clementine
-# 11427000 (1941-2017)
-get_usgs_dv(gage = 11427000, site = "NFA", facetYr = 1974, filterYrs = F, savedat = T, saveplot = F)
-
-# quick wavelet analysis:
-load("data/flows/NFA_dv_USGS_11426500_1911_1941.rda")
-nfa <- filename
-
-site <- "NFA"
-
-nfa.w <- analyze.wavelet(nfa, my.series = 4, dt = 1/30) # usgs flow is in col 4
-
-wt.image(nfa.w, label.time.axis = T, show.date=TRUE, 
-         date.format = "%Y",
-         main = paste0(site, ": Seasonality of Daily Flow"),
+wt.image(w1, label.time.axis = T, show.date=TRUE, 
+         date.format = "%Y-%m-%d",
+         main = glue("{GAGE} : Seasonality of Daily Flow"),
          legend.params = list(lab = "cross-wavelet power levels"),
          timelab = "Time (years)", periodlab = "period (months)")
 
-wt.avg(nfa.w, show.siglvl = T, siglvl = c(.001, 0.01, 0.05))
+wt.avg(w1, show.siglvl = T, siglvl = c(.001, 0.01, 0.05))
 
-plotNFA<-nfa.w[c("Power.avg","Period","Power.avg.pval")] %>% as.data.frame
+plot_w1 <- w1[c("Power.avg","Period","Power.avg.pval")] %>% as.data.frame
 
 ggplot() + 
-  geom_line(data=plotNFA, aes(x=Period, y=Power.avg)) +
-  geom_point(data=plotNFA, aes(x=Period,y=Power.avg), 
-             col=ifelse(plotNFA$Power.avg.pval<0.05, "red", "blue")) + theme_bw() +
+  geom_line(data=plot_w1, aes(x=Period, y=Power.avg)) +
+  geom_point(data=plot_w1, aes(x=Period,y=Power.avg), 
+             col=ifelse(plot_w1$Power.avg.pval<0.05, "maroon", "steelblue")) + theme_bw() +
   scale_x_continuous(breaks=seq(0,64, 2), limits = c(0,64))
 
 # quick colwell analysis of seasonality:
@@ -59,15 +52,19 @@ ggplot() +
 ## we divided (M) by overall predictability (the sum of (M) and constancy (C)
 
 # standardize
-df.nfa <- nfa %>%  
-  rename(Date=date, Q=flow_cfs)
+df_flowdat <- flowdat %>% 
+  rename(Q=Flow) %>% 
+  select(Date, Q)
 
 # analyze
-nfa.Col <- hydrostats::Colwells(df.nfa)
-(nfa.season <- tibble(site=c(site), MP_metric=c(nfa.Col$MP)))
+df.Col <- hydrostats::Colwells(df_flowdat)
+(df.season <- tibble(site_no=c(GAGE$site_no), MP_metric=c(df.Col$MP)))
 
-# save models
-save(plotNFA, nfa.Col, nfa.season,  file = paste0("models/",site,"_usgs_wavelet_colwell.rda"))
+# compare?
+df_final <- read_rds("output/usgs_gages_colwells_w_streamclass_metric.rds")
+# revised flow data
+alt_revised <- read_rds("output/alt_revised_gages.rds") %>% select(-gagetype)
+ref_revised <- read_rds("output/ref_revised_gages.rds")
 
 
 # WAVELET LOOP ------------------------------------------------------------

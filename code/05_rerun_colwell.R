@@ -257,4 +257,4 @@ df_final %>%
 # Save out ----------------------------------------------------------------
 
 write_rds(df_final, file = "output/usgs_gages_colwells_w_streamclass_metric.rds")
-save(ceff_strmclass, file="output/eflows_streamclasses.rda", compress = "gzip")
+save(ceff_strmclass, file="output/eflows_streamclasses.rda", compress = "xz")
