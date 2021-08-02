@@ -9,7 +9,6 @@ library(hydrostats) # for seasonality colwell analysis
 library(viridis)
 library(ggforce)
 library(ggrepel)
-library(dataRetrieval)
 library(sf)
 library(glue)
 
@@ -19,19 +18,43 @@ library(glue)
 load("data/usgs_Q_daily_alt_gages.rda")
 load("data/usgs_Q_daily_ref_gages.rda")
 
+# Prep --------------------------------------------------------------------
+
+# get list of gages
+GAGE <- usgs_flows_ref %>% distinct(site_no) %>% slice(1:5)
+
+# filter!
+flowdat <- usgs_flows_ref %>% 
+  filter(site_no %in% GAGE$site_no) %>% 
+  mutate(date = ymd(as.character(Date), 
+                    tz="America/Los_Angeles"), .after="Date") %>% 
+  select(-agency_cd, -Date)
+
+# plot
+flowdat %>% ggplot() + geom_line(aes(x=date, y=Flow, color=site_no)) 
+
+# get list of dataframes
+datalist <- usgs_flows_ref %>% 
+  filter(site_no %in% GAGE$site_no) %>% 
+  mutate(date = ymd(as.character(Date), 
+                    tz="America/Los_Angeles"), .after="Date") %>% 
+  select(-agency_cd, -Date) %>% 
+  group_by(site_no) %>% 
+  group_split() 
+
 # WAVELET -----------------------------------------------------------------
 
-GAGE <- unique(usgs_flows_ref$site_no) %>% as.data.frame %>% 
-  rename(site_no = 1) %>% slice(1)
-flowdat <- usgs_flows_ref %>% filter(site_no %in% GAGE$site_no)
-flowdat %>% ggplot() + geom_line(aes(x=Date, y=Flow))
-
-w1 <- analyze.wavelet(flowdat, my.series = 5, dt = 1/30) 
-# usgs flow is in col 5
-# monthly analysis here if days are base unit
+# wavelet
+w1 <- analyze.wavelet(flowdat, my.series = 5, dt = 1/30, 
+                      date.format = "%Y-%m-%d", date.tz ="America/Los_Angeles")  
+# usgs flow is in col 5, 1/30 is monthly time frame
+w1$date.tz
+w1$date.format
 
 wt.image(w1, label.time.axis = T, show.date=TRUE, 
-         date.format = "%Y-%m-%d",
+         date.format = "%Y-%m-%d", 
+         date.tz = "America/Los_Angeles",
+         color.palette = "viridis(n.levels, option='B')",
          main = glue("{GAGE} : Seasonality of Daily Flow"),
          legend.params = list(lab = "cross-wavelet power levels"),
          timelab = "Time (years)", periodlab = "period (months)")
@@ -43,8 +66,26 @@ plot_w1 <- w1[c("Power.avg","Period","Power.avg.pval")] %>% as.data.frame
 ggplot() + 
   geom_line(data=plot_w1, aes(x=Period, y=Power.avg)) +
   geom_point(data=plot_w1, aes(x=Period,y=Power.avg), 
-             col=ifelse(plot_w1$Power.avg.pval<0.05, "maroon", "steelblue")) + theme_bw() +
-  scale_x_continuous(breaks=seq(0,64, 2), limits = c(0,64))
+             col=ifelse(plot_w1$Power.avg.pval<0.05, "maroon", "steelblue")) +
+  theme_bw(base_family = "Roboto Condensed") +
+  scale_x_continuous(breaks=seq(0,100, 4), limits = c(0,100))
+
+# WAVELET PURRR -----------------------------------------------------------
+
+# now apply above to a list
+wavlist <- map(datalist, ~analyze.wavelet(.x, my.series = 4, dt = 1/30,
+                                  date.format = "%Y-%m-%d", 
+                                  date.tz = "America/Los_Angeles"))
+
+wavlist <- wavlist %>% set_names(., GAGE$site_no)
+wavdat <- map_df(wavlist, ~.x[c("Power.avg","Period","Power.avg.pval")], .id = "site_no")
+table(wavdat$site_no)
+
+# write it out!!
+gagesNo <- "1_5"
+write_csv(wavdat, file = glue("output/wavelet_outputs_gages_{gagesNo}.csv"))
+
+# COLWELL -----------------------------------------------------------------
 
 # quick colwell analysis of seasonality:
 ## From Tonkin et al 2017: M (Contingency) as metric of seasonality
@@ -65,6 +106,9 @@ df_final <- read_rds("output/usgs_gages_colwells_w_streamclass_metric.rds")
 # revised flow data
 alt_revised <- read_rds("output/alt_revised_gages.rds") %>% select(-gagetype)
 ref_revised <- read_rds("output/ref_revised_gages.rds")
+
+
+
 
 
 # WAVELET LOOP ------------------------------------------------------------
