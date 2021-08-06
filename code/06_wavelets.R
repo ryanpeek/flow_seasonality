@@ -8,7 +8,6 @@ library(WaveletComp) # for wavelet analysis
 library(hydrostats) # for seasonality colwell analysis
 library(viridis)
 library(ggforce)
-library(ggrepel)
 library(sf)
 library(glue)
 
@@ -19,49 +18,79 @@ load("data/usgs_Q_daily_alt_gages.rda")
 load("data/usgs_Q_daily_ref_gages.rda")
 
 
-# Fix Dates ---------------------------------------------------------------
+# Prep Date Cols --------------------------------------------------------------------
 
-# check dates:
-tst <- usgs_flows_ref %>% group_by(site_no) %>% 
-  complete(Date = seq.Date(min(Date), max(Date), by = "day")) %>% 
-  group_by(site_no) %>%
-  mutate(diff = Date - lag(Date))
-
-
-# Prep --------------------------------------------------------------------
-
-# fix date cols
+# fix date cols & add continuous count of flowdays
 usgs_flows_ref <- usgs_flows_ref %>% 
   mutate(date = ymd(as.character(Date), 
                     tz="America/Los_Angeles"), .after="Date") %>% 
-  select(-agency_cd, -Date)
+  select(-agency_cd, -Date) %>% 
+  group_by(site_no) %>% 
+  complete(date = seq.Date(min(ymd(date)), max(ymd(date)), by = "day")) %>% 
+  # add count by days with flow
+  mutate(flowdays = ifelse(!is.na(Flow), 1, 0)) %>% 
+  mutate(flowcnt = ave(flowdays, cumsum(flowdays == 0), FUN = cumsum))
 
+# alt flows
 usgs_flows_alt <- usgs_flows_alt %>% 
   mutate(date = ymd(as.character(Date), 
                     tz="America/Los_Angeles"), .after="Date") %>% 
-  select(-agency_cd, -Date)
+  select(-agency_cd, -Date) %>% 
+  group_by(site_no) %>% 
+  complete(date = seq.Date(min(ymd(date)), max(ymd(date)), by = "day")) %>% 
+  # add count by days with flow
+  mutate(flowdays = ifelse(!is.na(Flow), 1, 0)) %>% 
+  mutate(flowcnt = ave(flowdays, cumsum(flowdays == 0), FUN = cumsum))
 
+
+# Filter to Subset --------------------------------------------------------
+
+# test with a few gages first
+GAGE_tst <- usgs_flows_ref %>% distinct(site_no) %>% 
+  slice(14:20) %>% arrange()
+
+# filter to a multiple
+flowdat_mult <- usgs_flows_ref %>%
+  filter(site_no %in% GAGE_tst$site_no) 
+
+# plot mult
+flowdat_mult %>% 
+  ggplot() + 
+  geom_line(aes(x=date, y=Flow, color=site_no), show.legend = FALSE) +
+  facet_wrap(~site_no, scales = "free")
+
+# now select one gage of interest
+# filter to a single df
+flowdat_single <- usgs_flows_ref %>% 
+  filter(site_no %in% GAGE_tst$site_no) %>% 
+  split(.$site_no) %>% 
+  pluck(2) # select a single dataframe
+
+
+# select one
+flowdat_single %>% 
+  ggplot() + 
+  geom_line(aes(x=date, y=Flow, color=site_no), show.legend = FALSE) +
+  facet_wrap(~site_no, scales = "free")
+
+# Add Col to Determine Continuous Periods ---------------------------------
+
+tst <- flowdat_single %>% 
+  group_by(site_no) %>% 
+  complete(date = seq.Date(min(ymd(date)), max(ymd(date)), by = "day")) %>% 
+  # add count by days with flow
+  mutate(flowdays = ifelse(!is.na(Flow), 1, 0)) %>% 
+  mutate(flowcnt = ave(flowdays, cumsum(flowdays == 0), FUN = cumsum))
 
 
 # Get Gages of Interest ---------------------------------------------------
 
 # get list of gages
-GAGE <- usgs_flows_ref %>% distinct(site_no) %>% slice(12:nrow(.))
-GAGE <- usgs_flows_ref %>% distinct(site_no) %>% slice(14:20)
+GAGE <- usgs_flows_ref %>% distinct(site_no) %>% 
+  arrange(site_no)# %>% 
+  #slice(1:nrow(.))
 
-# filter!
-flowdat <- usgs_flows_ref %>% 
-  filter(site_no %in% GAGE$site_no)
-
-# test dates
-# check dates:
-tst <- flowdat %>% group_by(site_no) %>% 
-  complete(Date = seq.Date(min(Date), max(Date), by = "day")) %>% 
-  count(Date, sort = TRUE)
-
-# plot
-flowdat %>% ggplot() + geom_line(aes(x=date, y=Flow, color=site_no), show.legend = FALSE) +
-  facet_wrap(~site_no, scales = "free")
+# Get List of Dataframes --------------------------------------------------
 
 # get list of dataframes
 datalist <- usgs_flows_ref %>% 
