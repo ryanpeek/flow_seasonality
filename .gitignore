@@ -6,3 +6,6 @@
 .httr-oauth
 
 *.html
+
+# wavelet models
+output/wavelets/wavelet_model*.rda
