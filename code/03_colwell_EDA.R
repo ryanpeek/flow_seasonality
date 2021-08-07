@@ -9,17 +9,45 @@ library(tidylog)
 library(ggdark)
 library(sf)
 
-# if already run, skip steps 01-07 , and start with 08
 
 # 01: Import Flow/GAGE Data -----------------------------------------------
 
 # flow data
-load("data/usgs_Q_daily_alt_gages.rda")
-load("data/usgs_Q_daily_ref_gages.rda")
+load("data/usgs_Q_daily_alt_gages_rev.rda") # nrow=14724405
+load("data/usgs_Q_daily_ref_gages_rev.rda") # nrow=4070777
 
 # revised flow data
 alt_revised <- read_rds("output/alt_revised_gages.rds") %>% select(-gagetype)
 ref_revised <- read_rds("output/ref_revised_gages.rds")
+
+# FILTER TO LONGEST PERIOD OF RECORD --------------------------------------
+
+# function to select longest period of record for gage:
+get_longest_flowperiod <- function(data){
+  data %>% 
+    slice( (which.max(flowcnt) - # max value row
+              # now 1 minus the max **value** to get first row 
+              (data %>% slice_max(flowcnt) %>% 
+                 pluck("flowcnt") - 1)):which.max(flowcnt), 
+           .preserve = TRUE) %>% 
+    as.data.frame()
+}
+
+usgs_flows_ref <- usgs_flows_ref %>% 
+  ungroup() %>% 
+  group_by(site_no) %>% 
+  group_split() %>% 
+  map(., ~get_longest_flowperiod(.x)) %>% 
+  bind_rows()
+
+
+usgs_flows_alt <- usgs_flows_alt %>% 
+  ungroup() %>% 
+  group_by(site_no) %>% 
+  group_split() %>% 
+  map(., ~get_longest_flowperiod(.x)) %>% 
+  bind_rows()
+
 
 # 02: GET SITES -----------------------------------------------------------
 
@@ -76,15 +104,18 @@ gage_ref_distinct <- flows_ref_meta %>% distinct(site_no)
 ## To standardize the role of seasonality in relation to overall predictability,
 ## we divided (M) by overall predictability (the sum of (M) and constancy (C)
 
+
 # standardize
-df_ref <- flows_ref_meta %>%   
+df_ref <- flows_ref_meta %>% 
+  ungroup() %>% 
   rename("Q"=Flow) %>% 
-  select(Date, Q, site_no) %>% 
-  mutate(Date = ymd(as.character(Date), tz = "US/Pacific")) %>% 
+  select(date, Q, site_no, flowcnt) %>% 
+  #mutate(Date = ymd(as.character(Date), tz = "US/Pacific")) %>% 
   group_by(site_no) %>% 
   group_split() %>%
   #.[1:30] %>% # extract
-  map(., ~as.data.frame(.x)) 
+  #map(., ~get_longest_flowperiod(data = .x)) #%>% 
+  map(., ~as.data.frame(.x))
 
 # calc colwells and add ID
 df_colwell_ref <- df_ref %>% 
