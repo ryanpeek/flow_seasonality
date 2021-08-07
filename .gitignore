@@ -9,3 +9,4 @@
 
 # wavelet models
 output/wavelets/wavelet_model*.rda
+data/eflows_final_classification_9CLASS/Final_Classification_9Class*

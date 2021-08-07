@@ -9,19 +9,6 @@ library(tidylog)
 library(ggdark)
 library(sf)
 
-
-# 01: Import Flow/GAGE Data -----------------------------------------------
-
-# flow data
-load("data/usgs_Q_daily_alt_gages_rev.rda") # nrow=14724405
-load("data/usgs_Q_daily_ref_gages_rev.rda") # nrow=4070777
-
-# revised flow data
-alt_revised <- read_rds("output/alt_revised_gages.rds") %>% select(-gagetype)
-ref_revised <- read_rds("output/ref_revised_gages.rds")
-
-# FILTER TO LONGEST PERIOD OF RECORD --------------------------------------
-
 # function to select longest period of record for gage:
 get_longest_flowperiod <- function(data){
   data %>% 
@@ -32,6 +19,57 @@ get_longest_flowperiod <- function(data){
            .preserve = TRUE) %>% 
     as.data.frame()
 }
+
+# 01: Import Flow/GAGE Data -----------------------------------------------
+
+# flow data
+load("data/usgs_Q_daily_alt_gages_rev.rda") # nrow=14724405
+load("data/usgs_Q_daily_ref_gages_rev.rda") # nrow=4070777
+
+# revised flow data
+alt_revised <- read_rds("output/alt_revised_gages.rds") %>% 
+  mutate(date = ymd(as.character(Date), 
+                    tz="America/Los_Angeles"), .after="Date") %>% 
+  select(-agency_cd, -Date, -gagetype) %>% 
+  group_by(site_no) %>% 
+  complete(date = seq.Date(min(ymd(date)), max(ymd(date)), by = "day")) %>% 
+  # add count by days with flow
+  mutate(flowdays = ifelse(!is.na(Flow), 1, 0)) %>% 
+  mutate(flowcnt = ave(flowdays, cumsum(flowdays == 0), FUN = cumsum)) %>% 
+  ungroup %>% 
+  group_by(site_no) %>% 
+  group_split() %>% 
+  map(., ~get_longest_flowperiod(.x)) %>% 
+  bind_rows()
+
+# plot
+# ggplot() + 
+#   geom_line(data=alt_revised, aes(x=date, y=Flow, color=site_no), show.legend = FALSE) +
+#   facet_wrap(.~site_no, scales = "free")
+
+# fix
+ref_revised <- read_rds("output/ref_revised_gages.rds") %>% 
+  mutate(date = ymd(as.character(Date), 
+                    tz="America/Los_Angeles"), .after="Date") %>% 
+  select(-agency_cd, -Date) %>% 
+  group_by(site_no) %>% 
+  complete(date = seq.Date(min(ymd(date)), max(ymd(date)), by = "day")) %>% 
+  # add count by days with flow
+  mutate(flowdays = ifelse(!is.na(Flow), 1, 0)) %>% 
+  mutate(flowcnt = ave(flowdays, cumsum(flowdays == 0), FUN = cumsum)) %>% 
+  ungroup %>% 
+  group_by(site_no) %>% 
+  group_split() %>% 
+  map(., ~get_longest_flowperiod(.x)) %>% 
+  bind_rows()
+
+# plot
+# ggplot() + 
+#   geom_line(data=ref_revised, aes(x=date, y=Flow, color=site_no), show.legend = FALSE) +
+#   facet_wrap(.~site_no, scales = "free")
+
+# FILTER TO LONGEST PERIOD OF RECORD --------------------------------------
+
 
 usgs_flows_ref <- usgs_flows_ref %>% 
   ungroup() %>% 
@@ -47,7 +85,6 @@ usgs_flows_alt <- usgs_flows_alt %>%
   group_split() %>% 
   map(., ~get_longest_flowperiod(.x)) %>% 
   bind_rows()
-
 
 # 02: GET SITES -----------------------------------------------------------
 
@@ -66,30 +103,28 @@ gage_metadat <- bind_rows(alt_meta, ref_meta)
 # ALT REVISED
 flows_alt <- usgs_flows_alt %>% 
   bind_rows(., alt_revised)
-
-usgs_flows_alt %>% distinct(site_no) %>% tally()
-flows_alt %>% distinct(site_no) %>% tally()
+  
+# look at unique, should add sites
+usgs_flows_alt %>% distinct(site_no) %>% tally() # n=748
+flows_alt %>% distinct(site_no) %>% tally() # n=756
 
 # REF REVISED: here same number of gages but records are diff
 flows_ref <- usgs_flows_ref %>% 
   filter(!site_no %in% unique(ref_revised$site_no)) %>% 
   bind_rows(., ref_revised)
 
-# check: should be same number
+# check: should be same number (n=219)
 usgs_flows_ref %>% distinct(site_no) %>% tally()
 flows_ref %>% distinct(site_no) %>% tally()
-
 
 # 04: Join with Metadata ------------------------------------------------------
 
 # filter and join
 flows_alt_meta <- flows_alt %>% 
-  select(-agency_cd) %>% 
   left_join(., gage_metadat, by=c("site_no"))
 
 # ref
 flows_ref_meta <- flows_ref %>% 
-  select(-agency_cd) %>% 
   left_join(., gage_metadat, by=c("site_no"))
 
 # distinct_gage_lists
@@ -108,13 +143,11 @@ gage_ref_distinct <- flows_ref_meta %>% distinct(site_no)
 # standardize
 df_ref <- flows_ref_meta %>% 
   ungroup() %>% 
-  rename("Q"=Flow) %>% 
-  select(date, Q, site_no, flowcnt) %>% 
-  #mutate(Date = ymd(as.character(Date), tz = "US/Pacific")) %>% 
+  rename("Q"=Flow, Date=date) %>% 
+  select(Date, Q, site_no, flowcnt) %>% 
   group_by(site_no) %>% 
   group_split() %>%
   #.[1:30] %>% # extract
-  #map(., ~get_longest_flowperiod(data = .x)) #%>% 
   map(., ~as.data.frame(.x))
 
 # calc colwells and add ID
@@ -127,9 +160,8 @@ df_colwell_ref <- df_ref %>%
 
 # standardize
 df_alt <- flows_alt_meta %>%   
-  rename("Q"=Flow) %>% 
+  rename("Q"=Flow, Date=date) %>% 
   select(Date, Q, site_no) %>% 
-  mutate(Date = ymd(as.character(Date), tz = "US/Pacific")) %>% 
   group_by(site_no) %>% 
   group_split() %>%
   #.[1:30] %>% # extract
@@ -237,6 +269,8 @@ csci_por_colwell %>%
   labs(y="Seasonality (Colwell's M/P)", x="CSCI",
        caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)")
 
+ggsave(filename = "figures/colwells_ref_alt_vs_csci_gam_trend.png", width = 10, height = 8, dpi = 300, units = "in")
+
 # CSCI BY GAGETYPE FACETED
 csci_por_colwell %>% 
   ggplot() + 
@@ -276,7 +310,7 @@ df_final %>%
   ggplot() + 
   geom_point(aes(y=MP_metric, x=csci, fill=CLASS_NAME), pch=21, size=2.7, alpha=0.9) +
   stat_smooth(aes(y=MP_metric, x=csci), color="black",  
-              method = "gam", se = FALSE) +
+              method = "glm", se = FALSE) +
   theme_classic(base_family = "Roboto Condensed") +
   scale_color_viridis_d(option = "B", "Gage Type") +
   scale_fill_viridis_d(option = "A", "StreamClass") +
