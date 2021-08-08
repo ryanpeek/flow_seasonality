@@ -29,7 +29,8 @@ df_wav <- df %>%
 rm(df)
 
 # pull max value for period at 12 months
-df_wav_summ <- df_wav %>% 
+df_wav <- df_wav %>% 
+  filter(Period > 11 & Period < 13) %>% 
   group_by(site_id) %>% 
   slice_max(Power.avg)
 
@@ -71,10 +72,8 @@ df_csci_final <- left_join(csci_por_colwell, ceff_strmclass, by=c("comid_gage"="
 
 # Join Colwell with Wavelet -----------------------------------------------
 
-df_final <- left_join(df_csci_final, df_wav, by="site_id") %>% 
-  distinct(site_id, StationCode, SampleID, .keep_all = TRUE)
-
-
+df_final <- left_join(df_csci_final, df_wav, by="site_id") #%>% 
+  #distinct(site_id, StationCode, SampleID, .keep_all = TRUE)
 
 # Make Plot of Seasonality vs. Predictabilty by StreamClass for Ref -------
 

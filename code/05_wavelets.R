@@ -66,14 +66,14 @@ flowdat_single %>%
 # Get Gages of Interest ---------------------------------------------------
 
 # get list of gages
-GAGE <- usgs_flows_ref %>% ungroup() %>% 
+GAGE <- usgs_flows_alt %>% ungroup() %>% 
   distinct(site_no) %>% 
   dplyr::arrange(site_no)
 
 # Get List of Dataframes --------------------------------------------------
 
 # get list of dataframes
-datalist <- usgs_flows_ref %>% 
+datalist <- usgs_flows_alt %>% 
   filter(site_no %in% GAGE$site_no) %>% 
   group_by(site_no) %>% 
   group_split() 
