@@ -8,7 +8,7 @@
 *.html
 
 # wavelet models
-output/figures/wavelet
+figures/wavelet
 output/wavelets/ref/*csv
 output/wavelets/alt/*csv
 output/wavelets/ref/wavelet_model*.rda
