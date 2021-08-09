@@ -64,6 +64,9 @@ ggplot() +
   #scale_y_continuous(breaks=seq(0,36,4)) +
   facet_grid(gagetype~.)
 
+ggsave(filename = "figures/wavelet_period_plots_all_gages.png", 
+       width = 11, height = 8, dpi=300, units = "in")
+
 # pull max value for period at 12 months
 df_wav_12 <- df_wav %>% 
   group_by(site_id, gagetype) %>% 
@@ -89,9 +92,6 @@ ggplot() +
 ggplot() + 
   geom_jitter(data=df_wav_12, aes(x=Period, y=Power.avg, fill=gagetype), pch=21) +
   scale_fill_viridis_d()
-ggplot() + 
-  geom_jitter(data=df_wav_max, aes(x=Period, y=Power.avg, fill=gagetype), pch=21) +
-  scale_fill_viridis_d() + facet_wrap(.~gagetype)
 
 
 # Get StreamClasses -------------------------------------------------------
@@ -137,12 +137,11 @@ df_final <- left_join(df_csci_final, df_wav_max, by="site_id") #%>%
 table(df_final$gagetype.x)
 table(df_final$gagetype.y)
 
-
-
 # PLOT STREAMCLASSES ------------------------------------------------------
 
 # make sf and plot
 library(mapview)
+mapviewOptions(fgb = TRUE)
 
 df_final_sf <- df_final %>% 
   st_as_sf(coords=c("dec_long_va", "dec_lat_va"), crs=4269, remove=FALSE)
@@ -187,15 +186,18 @@ df_final %>%  filter(!is.na(CLASS_NAME)) %>%
   ggplot() + geom_point(aes(x=MP_metric, y=Power.avg, fill=gagetype.x, shape=gagetype.x, size=Period),
                         alpha=0.8) + 
   scale_shape_manual("GageType", values=c(21,22)) +
-  scale_size_binned(breaks = c(3,6,9,12)) +
+  scale_size_binned("Period (months)",breaks = c(3,6,9,12)) +
   ggthemes::scale_fill_colorblind("GageType") +
   theme_classic(base_family = "Roboto Condensed") +
   facet_wrap(.~CLASS_NAME)
 
+ggsave(filename = "figures/wavelet_vs_colwell_by_streamclass_and_period.png", 
+       width = 11, height = 8, dpi=300, units = "in")
 
+# plot 2
 df_final %>%  filter(!is.na(CLASS_NAME)) %>% 
   ggplot() + geom_point(aes(x=MP_metric, y=csci, fill=CLASS_NAME, shape=gagetype.x),
-                        alpha=0.8, size=4) + 
+                        alpha=0.8, size=4, show.legend = FALSE) + 
   scale_shape_manual("GageType", values=c(21,22)) +
   geom_smooth(method = "lm",se = FALSE,
               aes(x=MP_metric, y=csci, group=CLASS_NAME), col="black", alpha=0.5) +
@@ -203,6 +205,8 @@ df_final %>%  filter(!is.na(CLASS_NAME)) %>%
   scale_fill_viridis_d("GageType") +
   theme_classic(base_family = "Roboto Condensed") +
   facet_wrap(gagetype.x~CLASS_NAME)
+ggsave(filename = "figures/wavelet_vs_csci_by_streamclass_and_period_w_trendline.png", 
+       width = 11, height = 8, dpi=300, units = "in")
 
 
 # Save Data Out -----------------------------------------------------------
