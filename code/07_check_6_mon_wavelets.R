@@ -100,7 +100,12 @@ df_meta12 <- df_wav_12 %>% filter(Power.avg>=17.96) %>%
 library(mapview)
 mapviewOptions(fgb = FALSE)
 
-mapview(df_meta6, zcol="gagetype.y", col.regions=RColorBrewer::brewer.pal(2,"Set1")) + mapview(df_meta12, zcol="gagetype.y")
+mapview(df_meta6, zcol="gagetype.y", 
+        col.regions=viridis::viridis(2,option = "C", direction = -1),
+        #col.regions=RColorBrewer::brewer.pal(2,"Set1"), 
+        layer.name="GageType (6m)", cex=2.5) + 
+  mapview(df_meta12, zcol="gagetype.y", layer.name="GageType (12m)",
+          col.regions=viridis::viridis(2,option = "C", direction = -1))
 
 
 # Get StreamClasses -------------------------------------------------------
@@ -116,20 +121,68 @@ st_crs(ceff_strmclass)$epsg
 
 # Spatial Join ------------------------------------------------------------
 
-#mapview(ceff_strmclass) + mapview(df_meta, col.regions="orange")
+# big map
+mapview(ceff_strmclass) + 
+  mapview(df_meta6, col.regions="orange", cex=2.5) +
+  mapview(df_meta12, col.regions="darkgreen")
+
+## 6 MONTH -----------------------
 
 # make diff proj
 df_meta6 <- df_meta6 %>% st_transform(3310)
 ceff_strmclass <- ceff_strmclass %>% st_transform(3310) %>% 
   st_zm()
-df_meta6_class <- st_join(df_meta6, ceff_strmclass, st_is_within_distance, dist = 100)
-summary(df_meta6_class)
-mapview(df_meta6_class, zcol="CLASS_NAME")
+df_meta6_class <- st_join(df_meta6, ceff_strmclass, st_is_within_distance, dist = 500)
+#summary(df_meta6_class)
+mapview(df_meta6_class, zcol="CLASS_NAME") + 
+  mapview(ceff_strmclass)
+
+# filter out sites with "CN" or "TAILRACE" or "DIV" in name, AND
+# filter out:
+# 09530000 (CN)
+# 09529800 (CN)
+# 09529600 (CN)
+# 11246570 (PH)
+# 11406900 (Oroville INTAKE)
+
+df_meta6_class %>% 
+  filter(grepl("CN|TAILRACE|DIV|INTAKE", station_nm)) %>% 
+  #distinct(site_id, .keep_all = TRUE) %>% 
+  #View() # n=13, 
+  #but need to remove TUO early Intake sites (11276600, 11276900)
+  #and 11403530 bucks ck, 11230530 bear ck
+  #mapview(., zcol="CLASS_NAME")
+  distinct(site_id, .keep_all = TRUE) %>% st_drop_geometry() %>% 
+  filter(!site_id %in% c("11276600", "11276900", "11403530", "11230530")) %>% 
+  select(site_id, station_nm) -> df6_canals_to_drop
+
+## 12 MONTH ---------------------
 
 df_meta12 <- df_meta12 %>% st_transform(3310)
-df_meta12_class <- st_join(df_meta12, ceff_strmclass, st_is_within_distance, dist = 100)
-summary(df_meta12_class)
-mapview(df_meta12_class, zcol="CLASS_NAME")
+df_meta12_class <- st_join(df_meta12, ceff_strmclass, st_is_within_distance, dist = 500)
+#summary(df_meta12_class)
+mapview(df_meta12_class, zcol="CLASS_NAME") +
+  mapview(ceff_strmclass)
+
+# see the both:
+mapview(df_meta6_class, zcol="CLASS_NAME") + 
+  mapview(df_meta12_class, zcol="CLASS_NAME") 
+
+# filter out sites with "CN" or "TAILRACE" or "DIV" in name, AND
+# 10287145 (powerhouse)
+# 10287195 (tailrace)
+# 10270900 (Diversion)
+
+df_meta12_class %>% 
+  filter(grepl("CN|TAILRACE|DIV|INTAKE", station_nm)) %>% 
+  #distinct(site_id, .keep_all = TRUE) %>% 
+  distinct(site_id, .keep_all = TRUE) %>% st_drop_geometry() %>% 
+  select(site_id, station_nm) -> df12_canals_to_drop
+#View() # n=37!
+#mapview(., zcol="CLASS_NAME")
+
+# SAVE
+save(df6_canals_to_drop, df12_canals_to_drop, file="output/usgs_gages_to_drop_div_canals.rda")
 
 # Pull Actual Flow Data ---------------------------------------------------
 
