@@ -230,11 +230,12 @@ df_colwell_all_meta %>%
 
 # 10: BRING IN CSCI -------------------------------------------------------
 
-# only alt dataset with percentiles
-csci_alt <- read_rds("data/06_csci_por_trim_final_dataset.rds") %>% 
-  select(StationCode:HUC_12, site_id, comid_gage:delta_p50) %>% 
-  distinct(StationCode, SampleID, site_id, .keep_all=TRUE)
-table(csci_alt$CEFF_type) # n=521
+# bring in data:
+csci_trim <- read_rds("data/02c_selected_final_bmi_csci_dat_trim.rds")
+csci_trim %>% st_drop_geometry() %>% 
+  #distinct(StationCode, site_id, .keep_all = TRUE) %>% nrow() # 431
+  #distinct(StationCode, .keep_all = TRUE) %>% nrow() # 246 CSCI sites
+  distinct(site_id, .keep_all = TRUE) %>% nrow() # 209 CSCI sites
 
 # older dataset w alt and ref gages
 csci_por <- read_rds("data/04_selected_csci_ffm_por_trim.rds") %>% 

@@ -4,10 +4,6 @@
 
 library(tidyverse)
 library(lubridate)
-library(WaveletComp) # for wavelet analysis
-library(hydrostats) # for seasonality colwell analysis
-library(viridis)
-library(ggforce)
 library(sf)
 library(glue)
 
@@ -30,6 +26,9 @@ usgs_flows_ref <- usgs_flows_ref %>%
   mutate(flowdays = ifelse(!is.na(Flow), 1, 0)) %>% 
   mutate(flowcnt = ave(flowdays, cumsum(flowdays == 0), FUN = cumsum))
 
+# total ref?
+usgs_flows_ref %>% distinct(site_no, .keep_all=TRUE) %>% nrow()
+
 # alt flows
 usgs_flows_alt <- usgs_flows_alt %>% 
   mutate(date = ymd(as.character(Date), 
@@ -40,6 +39,8 @@ usgs_flows_alt <- usgs_flows_alt %>%
   # add count by days with flow
   mutate(flowdays = ifelse(!is.na(Flow), 1, 0)) %>% 
   mutate(flowcnt = ave(flowdays, cumsum(flowdays == 0), FUN = cumsum))
+
+usgs_flows_alt %>% distinct(site_no, .keep_all=TRUE) %>% nrow()
 
 save(usgs_flows_ref, file="data/usgs_Q_daily_ref_gages_rev.rda", compress = "xz" )
 save(usgs_flows_alt, file="data/usgs_Q_daily_alt_gages_rev.rda", compress = "xz")
