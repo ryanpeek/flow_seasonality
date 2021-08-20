@@ -1,0 +1,43 @@
+---
+title: "Seasonality & Flow Alteration & Biological Condition"
+description: |
+  Analysis of intra-annual seasonality and inter-annual predictability in CA rivers
+author:
+  - name: Ryan Peek 
+date: "`r Sys.Date()`"
+output: distill::distill_article
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(here)
+library(glue)
+```
+
+# The Question
+
+ > Does flow modification influence seasonality and biological condition (ASCI/CSCI)?
+ > Does stream class play a role in increasing or decreasing the impact of flow alteration in conjunction with seasonality and biological condition?
+ 
+ 
+## Analysis Components
+
+  1. Pick representative gages for 3 main classes, (**Rain**, **Mixed**, **Snow**), run wavelet and colwell's to see if we understand the return.
+  2. Pick representative gages for 3 regulation classes (**Hydropeaking**, **Bypass**, **Unregulated**) and do the same. What do we return?
+  
+  
+## Steps for Data Cleaning
+
+ 1. Download USGS gage data and metadata for 900+ gages
+ 2. Filter to gages that AREN'T Canals, Intake/Outtake, Weirs, PH, PP, etc.
+ 3. Fill Flow records for complete time frame and take longest running count without an NA
+ 4. Filter data to longest contiguous stretch of data
+ 5. Uupdate and sync data for analysis
+ 6. Run wavelet and colwells
+ 7. Rerun FFC on data?
+ 8.  Look at sites with high predict from altered gage list...why? What does flow pattern look like? What percentile do they fall into (where can we break and filter these out?)
+
+
+
+

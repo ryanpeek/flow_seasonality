@@ -25,13 +25,41 @@ load("output/wavelet_combined_period_power_outputs.rda")
 # df_wav_6: max power at 6 months
 
 # get GAGE metadata
-usgs_daily_alt <- read_csv("data/usgs_metadata_alt_gages.csv")
+usgs_daily_alt <- read_csv("data/usgs_metadata_alt_gages.csv") 
 usgs_daily_ref <- read_csv("data/usgs_metadata_ref_gages.csv") %>% 
   mutate(site_id = as.character(site_id))
-gages_meta <- bind_rows(usgs_daily_alt, usgs_daily_ref)
+gages_meta <- bind_rows(usgs_daily_alt, usgs_daily_ref) # 969
+table(gages_meta$gagetype) # 221 ref
 
 rm(usgs_daily_alt, usgs_daily_ref)
 
+## Get StreamClasses -------------------------------------------------------
+
+ceff_strmclass <- st_read("data/eflows_final_classification_9CLASS/Final_Classification_9CLASS.shp")
+
+# crosswalk
+strmclass_xwalk <- tibble("CLASS"=c(1,2,3,4,5,6,7,8,9), "CLASS_NAME"=c("snowmelt","high-volume snowmelt and rain", "low-volume snowmelt and rain", "winter storms","groundwater","perennial groundwater and rain","flashy, ephemeral rain","rain and seasonal groundwater","high elevation low precipitation"))
+
+# join with class names
+ceff_strmclass <- left_join(ceff_strmclass, strmclass_xwalk)
+st_crs(ceff_strmclass)$epsg
+
+# check with FFC Ref list?
+ref_223 <- read_csv("https://raw.githubusercontent.com/ceff-tech/bmi_ffm_links/main/data/usgs/gages_ref_223_period_record.csv") %>% 
+  separate(stream_class, into = c("class","CLASS"), sep="-", remove=T) %>% 
+  select(-c(class, stat, data)) %>% 
+  mutate(CLASS = as.numeric(CLASS),
+         site_id = as.character(gage))
+
+# join:
+ref_223 <- left_join(ref_223, strmclass_xwalk)
+table(ref_223$CLASS)
+
+# join with gage metadata
+ref_223_meta <- left_join(ref_223, gages_meta) %>% 
+  select(CLASS, gage, site_id, minYr, maxYr, YrRange, yr_begin, yr_end, yr_total, gagetype)
+
+write_csv(ref_223_meta, file = "output/ref_gages_period_of_rec_comparison.csv")
 
 # Calculate Wavelet Quantiles and Filter  ----------------------------------
 
@@ -146,18 +174,8 @@ df_meta_filt <- df_meta_filt %>%
   left_join(., df_colwell_all_meta, by=c("site_id"="site_no")) %>% 
   select(site_id, MP_metric, Power.avg:dec_long_va, alt_va, huc8, date_begin:gagetype.y)
 
-## Get StreamClasses -------------------------------------------------------
 
-# ceff_strmclass <- st_read("data/eflows_final_classification_9CLASS/Final_Classification_9CLASS.shp")
-# 
-# # crosswalk
-# strmclass_xwalk <- tibble("CLASS"=c(1,2,3,4,5,6,7,8,9), "CLASS_NAME"=c("snowmelt","high-volume snowmelt and rain", "low-volume snowmelt and rain", "winter storms","groundwater","perennial groundwater and rain","flashy, ephemeral rain","rain and seasonal groundwater","high elevation low precipitation"))
-# 
-# # join with class names
-# ceff_strmclass <- left_join(ceff_strmclass, strmclass_xwalk)
-# st_crs(ceff_strmclass)$epsg
-
-## Spatial Join ------------------------------------------------------------
+## Spatial Join by StreamClass -----------------------------------------------
 
 # make diff proj
 # df_meta_filt_class <- df_meta_filt %>% st_transform(3310)
@@ -169,7 +187,7 @@ df_meta_filt <- df_meta_filt %>%
 
 
 
-# FINAL DATASET: Filtered Meta with Colwells ----------------------------------------
+# FINAL DATASET: Filtered Meta with Colwells --------------------------------
 
 # this is the selected gages with stream class and colwell, 
 # needs to be filtered by bunk gages

@@ -1,4 +1,4 @@
-# EDA of Colwell and CSCI
+# Review Ref Gages
 
 library(tidyverse)
 library(glue)
@@ -13,6 +13,7 @@ library(plotly)
 
 # grab flow data and plot:
 load("data/usgs_Q_daily_ref_gages.rda")
+load("data/usgs_Q_daily_ref_gages_por.rda")
 
 # filter to gages of interest:
 usgs_ref_filt <- usgs_flows_ref #%>% 
@@ -84,7 +85,6 @@ View(low_colw_ref)
 
 # Now Fix: Truncate ----------------------------------------------------------------
 
-### CREATE SPREADSHEET WITH GAGE, ALT/REF, DATE TO TRUNCATE BY, and then plug into purrr::filter?
 
 # pull out ALT sites to relabel
 usgs_ref_to_alt <- usgs_ref_filt %>% 

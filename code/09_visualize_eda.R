@@ -73,11 +73,11 @@ refdat <- usgs_flows_ref %>%
   wateRshedTools::add_WYD("date")
 altdat <- usgs_flows_alt %>% 
   filter(site_no %in% unique(df_filt$site_id)) %>% 
-  #left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>% 
+  #left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
   wateRshedTools::add_WYD("date")
 
 
-# PLOT 6MON by Colwells -------------------------------------------------------
+# MEAN ANN PLOT 6MON by Colwells -------------------------------------------------------
 
 # mean annual
 altdat6 %>% distinct(site_no) %>% nrow() # unfilt: n=20
@@ -175,7 +175,7 @@ ggsave(filename = "figures/mean_ann_logflow_alt_ref_6mon_filt_75_wav.png",
 
 
 
-# Now Plot Max Wavelet Score for All CSCI Sites ---------------------------
+# MEAN ANN Max Wavelet Score for All CSCI Sites ---------------------------
 
 # mean annual
 altdat %>% distinct(site_no) %>% nrow() #n=137
@@ -331,6 +331,11 @@ p_3 <- df_wav_max_filt %>%
 p_1 + p_2 + p_3
 ggsave(filename = "figures/boxplots_of_csci_sites_max_wav.png", width = 11, height = 8, dpi=300)
 
+
+
+# GAM Plots ---------------------------------------------------------------
+
+
 df_wav_max_filt %>% 
   left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_id")) %>%
   ggplot() + geom_point(aes(x=csci, y=Power.avg, fill=gagetype), pch=21) +
@@ -350,3 +355,29 @@ df_wav_max_filt %>%
   geom_smooth(aes(x=csci, y=MP_metric, fill=gagetype), method = "gam") 
 
 
+
+# Stream Classes ----------------------------------------------------------
+
+ceff_strmclass <- st_read("data/eflows_final_classification_9CLASS/Final_Classification_9CLASS.shp")
+
+# crosswalk
+strmclass_xwalk <- tibble("CLASS"=c(1,2,3,4,5,6,7,8,9), "CLASS_NAME"=c("snowmelt","high-volume snowmelt and rain", "low-volume snowmelt and rain", "winter storms","groundwater","perennial groundwater and rain","flashy, ephemeral rain","rain and seasonal groundwater","high elevation low precipitation"))
+
+# join with class names
+ceff_strmclass <- left_join(ceff_strmclass, strmclass_xwalk)
+st_crs(ceff_strmclass)$epsg
+
+# collapse stream classes:
+ceff_strmclass <- ceff_strmclass %>% 
+  mutate(class_simple = case_when(
+    
+  ))
+
+
+## Spatial Join ------------------------------------------------------------
+
+# make diff proj
+# df_meta_filt_class <- df_meta_filt %>% st_transform(3310)
+# ceff_strmclass <- ceff_strmclass %>% st_transform(3310) %>%
+#   st_zm()
+# df_meta_filt_class <- st_join(df_meta_filt_class, ceff_strmclass, st_is_within_distance, dist = 100)
