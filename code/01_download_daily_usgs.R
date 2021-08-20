@@ -188,4 +188,36 @@ write_csv(usgs_flows_ref, file = "data/usgs_Q_daily_ref_gages.csv.xz")
 save(usgs_flows_ref, file = "data/usgs_Q_daily_ref_gages.rda", compress = "xz")
 
 
+# Add two missing Ref sites -----------------------------------------------
 
+# not sure why they were dropped
+
+# bidwell
+usgs_ref_10360900 <- dataRetrieval::readNWISdv(siteNumbers="10360900", parameterCd = "00060", statCd='00003') %>% 
+  dataRetrieval::addWaterYear() %>% 
+  dataRetrieval::renameNWISColumns()
+
+# hat creek
+usgs_ref_11355500 <- dataRetrieval::readNWISdv(siteNumbers="11355500", parameterCd = "00060", statCd='00003') %>% 
+  dataRetrieval::addWaterYear() %>% 
+  dataRetrieval::renameNWISColumns() 
+plot(usgs_ref_11355500$Date, usgs_ref_11355500$Flow, type="l")
+# remove short stretch at end
+usgs_ref_11355500 <- usgs_ref_11355500 %>% 
+  filter(waterYear<1995)
+plot(usgs_ref_11355500$Date, usgs_ref_11355500$Flow, type="l")
+
+# combine and bind:
+usgs_ref_add <- bind_rows(usgs_ref_10360900, usgs_ref_11355500)
+
+# add to large dataset
+load("data/usgs_Q_daily_ref_gages.rda")
+
+usgs_flows_ref <- bind_rows(usgs_flows_ref, usgs_ref_add)
+
+# RESAVE
+# write out as compressed (.gz, bz2, or xz (lzma)): 
+write_csv(usgs_flows_ref, file = "data/usgs_Q_daily_ref_gages.csv.xz")
+
+# save as rda compressed:
+save(usgs_flows_ref, file = "data/usgs_Q_daily_ref_gages.rda", compress = "xz")
