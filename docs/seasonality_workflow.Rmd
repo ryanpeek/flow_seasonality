@@ -30,10 +30,14 @@ library(glue)
 ## Steps for Data Cleaning
 
  1. Download USGS gage data and metadata for 900+ gages
- 2. Filter to gages that AREN'T Canals, Intake/Outtake, Weirs, PH, PP, etc.
+ 2. Filter gages
+ 
+      a). Remove Canals, Intake/Outtake, Weirs, PH, PP  
+      b). Filter to selected REF period of record for 221 ref gages
+    
  3. Fill Flow records for complete time frame and take longest running count without an NA
  4. Filter data to longest contiguous stretch of data
- 5. Uupdate and sync data for analysis
+ 5. Update and sync data for analysis
  6. Run wavelet and colwells
  7. Rerun FFC on data?
  8.  Look at sites with high predict from altered gage list...why? What does flow pattern look like? What percentile do they fall into (where can we break and filter these out?)
