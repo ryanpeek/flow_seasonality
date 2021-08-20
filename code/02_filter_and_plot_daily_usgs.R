@@ -61,6 +61,8 @@ ref_221 <- left_join(ref_223, usgs_ref) %>%
 # remove old version
 rm(ref_223)
 
+# write out
+write_csv(ref_221, file = "output/usgs_ref_gages_221_POR_selected.csv")
 
 ## REF: Visualize Period of Record -----------------------------------------
 
@@ -205,50 +207,50 @@ save(usgs_flows_alt_filt, file="data/usgs_Q_daily_alt_gages_filt.rda", compress 
 
 
 
-# Visualize Flow Data -----------------------------------------------------
+# PLOT: Visualize Flow Data -----------------------------------------------------
 
-# expects x and y to be date and flow, but specify col name in quotes
-source("code/f_plot_gage_facet.R")
-
-# get list of gages and facet plot
-usgs_flows_ref_meta %>% filter(site_no %in% usgs_ref$site_id[1:20]) %>% 
-  plot_gage_facet(., x="Date", y="Flow", logged = TRUE,
-                  facetid = "site_no", plotly = F)
-
-# get list of gages and facet plot
-# usgs_flows_ref_por %>% filter(site_no %in% ref_223$site_id[1:20]) %>% 
-#   plot_gage_facet(., x="date", y="Flow", logged = TRUE,
-#                   facetid = "site_no", plotly = T)
-
-# single gage
-g1 <- usgs_flows_ref_meta %>% filter(site_no %in% usgs_ref$site_id[2])
-
-# full POR
-ggplot(data=g1) +
-  geom_line(aes(x=Date, 
-                y=Flow,
-                #y=log(Flow), 
-                group=site_no, color=site_no), show.legend = F) +
-  labs(subtitle = glue("USGS {g1$site_no}: {g1$station_nm}")) +
-  theme_classic(base_family = "Roboto Condensed", base_size = 9) +
-  scale_color_viridis_d() + 
-  labs(y="Flow (cfs)", x="") +
-  theme(axis.text.x = element_text(angle=90, hjust = 1))
-
-# save
-#ggsave(filename = "figs/hydrographs_highly_alt_gageids_1-20.png", width = 11, height = 8.5, dpi=300)
-
-# create a version with a zoom year
-zoomYr <- 1988
-
-# full POR
-ggplot(data=g1) +
-  geom_line(aes(x=Date, 
-                y=Flow,
-                #y=log(Flow), 
-                group=site_no, color=site_no), show.legend = F) +
-  labs(subtitle = glue("USGS {g1$site_no}: {g1$station_nm}")) +
-  theme_classic(base_family = "Roboto Condensed", base_size = 9) +
-  scale_color_viridis_d() + labs(y="Flow (cfs)", x="") +
-  theme(axis.text.x = element_text(angle=90, hjust = 1)) +
-  ggforce::facet_zoom(x = lubridate::year(g1$Date) == zoomYr, shrink=T)
+# # expects x and y to be date and flow, but specify col name in quotes
+# source("code/f_plot_gage_facet.R")
+# 
+# # get list of gages and facet plot
+# usgs_flows_ref_meta %>% filter(site_no %in% usgs_ref$site_id[1:20]) %>% 
+#   plot_gage_facet(., x="Date", y="Flow", logged = TRUE,
+#                   facetid = "site_no", plotly = F)
+# 
+# # get list of gages and facet plot
+# # usgs_flows_ref_por %>% filter(site_no %in% ref_223$site_id[1:20]) %>% 
+# #   plot_gage_facet(., x="date", y="Flow", logged = TRUE,
+# #                   facetid = "site_no", plotly = T)
+# 
+# # single gage
+# g1 <- usgs_flows_ref_meta %>% filter(site_no %in% usgs_ref$site_id[2])
+# 
+# # full POR
+# ggplot(data=g1) +
+#   geom_line(aes(x=Date, 
+#                 y=Flow,
+#                 #y=log(Flow), 
+#                 group=site_no, color=site_no), show.legend = F) +
+#   labs(subtitle = glue("USGS {g1$site_no}: {g1$station_nm}")) +
+#   theme_classic(base_family = "Roboto Condensed", base_size = 9) +
+#   scale_color_viridis_d() + 
+#   labs(y="Flow (cfs)", x="") +
+#   theme(axis.text.x = element_text(angle=90, hjust = 1))
+# 
+# # save
+# #ggsave(filename = "figs/hydrographs_highly_alt_gageids_1-20.png", width = 11, height = 8.5, dpi=300)
+# 
+# # create a version with a zoom year
+# zoomYr <- 1988
+# 
+# # full POR
+# ggplot(data=g1) +
+#   geom_line(aes(x=Date, 
+#                 y=Flow,
+#                 #y=log(Flow), 
+#                 group=site_no, color=site_no), show.legend = F) +
+#   labs(subtitle = glue("USGS {g1$site_no}: {g1$station_nm}")) +
+#   theme_classic(base_family = "Roboto Condensed", base_size = 9) +
+#   scale_color_viridis_d() + labs(y="Flow (cfs)", x="") +
+#   theme(axis.text.x = element_text(angle=90, hjust = 1)) +
+#   ggforce::facet_zoom(x = lubridate::year(g1$Date) == zoomYr, shrink=T)
