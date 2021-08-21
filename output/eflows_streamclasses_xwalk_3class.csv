@@ -1,0 +1,10 @@
+CLASS,CLASS_NAME,class3_name,class3_id
+1,snowmelt,SNOWMELT,1
+2,high-volume snowmelt and rain,MIXED,2
+3,low-volume snowmelt and rain,MIXED,2
+4,winter storms,RAIN,3
+5,groundwater,MIXED,2
+6,perennial groundwater and rain,RAIN,3
+7,"flashy, ephemeral rain",RAIN,3
+8,rain and seasonal groundwater,RAIN,3
+9,high elevation low precipitation,SNOWMELT,1

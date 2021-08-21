@@ -236,3 +236,4 @@ ggsave(filename = "figures/seasonality_colwell_by_streamclass3_alt_gam.png",
 
 write_rds(df_final, file = "output/usgs_gages_colwells_w_streamclass_metric.rds")
 save(ceff_strmclass, file="output/eflows_streamclasses.rda", compress = "gz")
+write_csv(strmclass_xwalk, file="output/eflows_streamclasses_xwalk_3class.csv")
