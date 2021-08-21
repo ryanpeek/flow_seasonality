@@ -21,37 +21,6 @@ usgs_flows_ref_por %>% distinct(site_no) %>% nrow() # n=221
 ref_gagelist <- unique(usgs_flows_ref_por$site_no)
 alt_gagelist <- unique(usgs_flows_alt_filt$site_no)
 
-## Get StreamClasses -------------------------------------------------------
-
-# get stream class and combine into 9 class and 3 class Xwalks 
-# see "3_color_classes_gages_legend"
-ceff_strmclass <- st_read("data/eflows_final_classification_9CLASS/Final_Classification_9CLASS.shp")
-
-# crosswalk
-strmclass_xwalk <- tibble(
-  "CLASS"=c(1,2,3,4,5,6,7,8,9), 
-  "CLASS_NAME"=c("snowmelt", # 3 class: 1=SNOWMELT
-                 "high-volume snowmelt and rain", # 3 class: 2=MIXED
-                 "low-volume snowmelt and rain", # 3 class: 2=MIXED,
-                 "winter storms", # 3 class: 3=RAIN
-                 "groundwater", # 3 class: 2=MIXED
-                 "perennial groundwater and rain", # 3 class: 3=RAIN
-                 "flashy, ephemeral rain", # 3 class: 3=RAIN
-                 "rain and seasonal groundwater", # 3 class: 3=RAIN
-                 "high elevation low precipitation"), # 3 class: 1=SNOWMELT
-  "class3_name" = c("SNOWMELT",
-                    "MIXED","MIXED","RAIN","MIXED",
-                    "RAIN","RAIN","RAIN",
-                    "SNOWMELT"),
-  "class3_id" = c(1,
-                  2,2,3,2,
-                  3,3,3,
-                  1))
-
-# join with class names
-ceff_strmclass <- left_join(ceff_strmclass, strmclass_xwalk)
-
-
 # Add Running Count of Continuous Flow Periods -----------------------------
 
 # REF: add continuous count of flow days (takes a minute)
