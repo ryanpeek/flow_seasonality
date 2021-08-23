@@ -31,6 +31,7 @@ ffcAPIClient::clean_account(ffctoken)
 
 # this uses the purrr package to loop through and pull ffc data for each gage
 source("code/f_iterate_ffc.R")
+source("code/f_ffc_collapse.R")
 
 # Data --------------------------------------------------------------------
 
@@ -42,11 +43,10 @@ load("data/usgs_Q_daily_ref_gages_trim.rda") # usgs_flows_ref
 load("data/usgs_Q_daily_alt_gages_trim.rda") # usgs_flows_alt
 
 # make a simple list of gage_id & gageIDName
-# gages <- df_final %>% 
-#   distinct(site_id, .keep_all = TRUE) %>% 
-#   mutate(site_id_name = paste0("T",site_id)) %>%
-#   select(site_id, site_id_name, comid, gagetype)
-# table(gages$gagetype)
+gages <- df_final %>%
+  distinct(site_id, .keep_all = TRUE) %>%
+  select(site_id, comid, gagetype, station_nm, usgs_lat, usgs_lon, MP_metric, class3_id, class3_name, CLASS_NAME)
+table(gages$gagetype)
 
 # Filter to CSCI Sites Only -----------------------------------------------
 
@@ -156,11 +156,9 @@ save(ffcs_alt, file = glue("output/ffc_alt_csci/usgs_ffm_alt_R6_full_{file_ts}.r
 
 # Combine FFC -------------------------------------------------------------
 
-# Load Function -----------------------------------------------------------
-
 source("code/f_ffc_collapse.R")
 
-# Setup Directory ---------------------------------------------------------
+## Setup Directory ---------------------------------------------------------
 
 # get type
 type <- "alt_csci" # alt_csci
@@ -180,7 +178,7 @@ fs::dir_create("output/ffc_combined")
 # look at modification time:
 file_info(fs::dir_ls(ffc_dir, glob = "*.rda"))[[5]] %>% floor_date(unit = "day")
 
-# Combine FFC: predicted_percentiles --------------------------------------
+## Combine FFC: predicted_percentiles --------------------------------------
 
 # set the data type:
 datatype <- "predicted_percentiles"
@@ -195,7 +193,7 @@ df_ffc %>% group_by(gageid) %>% tally() #%>% filter(n>23) %>% View() # view
 write_csv(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.csv"))
 write_rds(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.rds"), compress = "gz")
 
-# Combine FFC: alteration -------------------------------------------------
+## Combine FFC: alteration -------------------------------------------------
 
 # set the data type:
 datatype <- "alteration"
@@ -210,7 +208,7 @@ df_ffc %>% group_by(gageid) %>% tally() #%>% filter(n>23) %>% View() # view
 write_csv(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.csv"))
 write_rds(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.rds"), compress = "gz")
 
-# Combine FFC: ffc_percentiles --------------------------------------------
+## Combine FFC: ffc_percentiles --------------------------------------------
 
 # set the data type:
 datatype <- "ffc_percentiles"
@@ -225,7 +223,7 @@ df_ffc %>% group_by(gageid) %>% tally()
 write_csv(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.csv"))
 write_rds(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.rds"), compress = "gz")
 
-# Combine FFC: ffc_results ------------------------------------------------
+## Combine FFC: ffc_results ------------------------------------------------
 
 # set the data type:
 datatype <- "ffc_results"
@@ -254,4 +252,44 @@ write_rds(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{r
 # write_rds(df_ffc_long, file = glue("output/ffc_combined/usgs_{type}_{datatype}_long_run_{runDate}.rds"), compress = "gz")
 
 
+# Combine Ref and Alt FFC -------------------------------------------------
 
+# get dir
+ffc_dir <- glue("output/ffc_combined")
+ffc_files <- dir_ls(ffc_dir, type = "file", regexp = "*.csv")
+
+# function to read and combine the data
+ffc_combine_alt_ref <- function(datatype, fdir){
+  datatype = datatype
+  ffc_files = dir_ls(path = fdir, type = "file", regexp = "*.csv")
+  csv_list = ffc_files[grepl(glue("(alt|ref)_csci_{datatype}_run*"), ffc_files)]
+  # read in all
+  df <- purrr::map(csv_list, ~read_csv(.x)) %>%
+    # check and fix char vs. num
+    map(~mutate_at(.x, 'gageid', as.character)) %>%
+    bind_rows()
+  return(df)
+}
+
+
+# set the data type:
+datatype <- "predicted_percentiles"
+
+# combine
+df_ffc <- ffc_combine_alt_ref(datatype, fdir = ffc_dir)
+
+# view how many USGS gages
+df_ffc %>% distinct(gageid) %>% count()
+
+# how many records per gage?
+table(df_ffc$gageid)
+
+# add gagetype & metadata
+df_ffc_meta <- left_join(df_ffc, gages, by=c("gageid"="site_id", "comid"))
+
+df_ffc_meta %>% distinct(gageid, .keep_all = TRUE) %>% 
+  group_by(gagetype) %>% tally()
+
+# write out
+write_csv(df_ffc_meta, file = glue("output/ffc_meta_combined_{datatype}.csv"))
+write_rds(df_ffc_meta, file = glue("output/ffc_meta_combined_{datatype}.rds"), compress = "gz")
