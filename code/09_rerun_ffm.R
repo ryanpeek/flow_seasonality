@@ -150,5 +150,108 @@ ffcs_alt %>% keep(is.na(.)) %>% length()
 # write_lines(miss_gages_alt, file = glue("output/usgs_ffm_alt_missing_gages_{file_ts}.txt"))
 
 # Save Out: FFC R6 object (only if save=FALSE)
-# save(ffcs_alt, file = glue("output/ffc/usgs_ffm_alt_R6_full_{file_ts}.rda"))
+save(ffcs_alt, file = glue("output/ffc_alt_csci/usgs_ffm_alt_R6_full_{file_ts}.rda"))
+
+
+
+# Combine FFC -------------------------------------------------------------
+
+# Load Function -----------------------------------------------------------
+
+source("code/f_ffc_collapse.R")
+
+# Setup Directory ---------------------------------------------------------
+
+# get type
+type <- "alt_csci" # alt_csci
+
+# get dir
+ffc_dir <- glue("output/ffc_{type}/")
+ffc_files <- dir_ls(ffc_dir, type = "file", regexp = "*.csv")
+ffc_files
+# create output location:
+fs::dir_create("output/ffc_combined")
+
+# get run datetime
+(runDatetime <- fs::path_file(fs::path_ext_remove(fs::dir_ls(ffc_dir, glob = "*.rda"))) %>% 
+  str_extract(., "[0-9]{8}_[0-9]{4}"))
+(runDate <- str_extract(runDatetime, "[0-9]{8}"))
+
+# look at modification time:
+file_info(fs::dir_ls(ffc_dir, glob = "*.rda"))[[5]] %>% floor_date(unit = "day")
+
+# Combine FFC: predicted_percentiles --------------------------------------
+
+# set the data type:
+datatype <- "predicted_percentiles"
+df_ffc <- ffc_collapse(datatype, fdir = ffc_dir)
+
+# view how many USGS gages
+df_ffc %>% distinct(gageid) %>% count()
+# how many records per gage?
+df_ffc %>% group_by(gageid) %>% tally() #%>% filter(n>23) %>% View() # view
+
+# save it
+write_csv(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.csv"))
+write_rds(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.rds"), compress = "gz")
+
+# Combine FFC: alteration -------------------------------------------------
+
+# set the data type:
+datatype <- "alteration"
+df_ffc <- ffc_collapse(datatype, fdir = ffc_dir)
+
+# view how many USGS gages
+df_ffc %>% distinct(gageid) %>% count()
+# how many records per gage?
+df_ffc %>% group_by(gageid) %>% tally() #%>% filter(n>23) %>% View() # view
+
+# save it
+write_csv(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.csv"))
+write_rds(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.rds"), compress = "gz")
+
+# Combine FFC: ffc_percentiles --------------------------------------------
+
+# set the data type:
+datatype <- "ffc_percentiles"
+df_ffc <- ffc_collapse(datatype, fdir = ffc_dir)
+
+# view how many USGS gages
+df_ffc %>% distinct(gageid) %>% count()
+# how many records per gage?
+df_ffc %>% group_by(gageid) %>% tally()
+
+# save it
+write_csv(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.csv"))
+write_rds(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.rds"), compress = "gz")
+
+# Combine FFC: ffc_results ------------------------------------------------
+
+# set the data type:
+datatype <- "ffc_results"
+df_ffc <- ffc_collapse(datatype, fdir = ffc_dir)
+
+# view how many USGS gages
+df_ffc %>% distinct(gageid) %>% count()
+# how many years per gage?
+df_ffc %>% group_by(gageid) %>% tally() #%>% View()
+
+# save it
+write_csv(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.csv"))
+write_rds(df_ffc, file = glue("output/ffc_combined/usgs_{type}_{datatype}_run_{runDate}.rds"), compress = "gz")
+
+# FOR ffc_results: Pivot Longer
+# df_ffc_long <- df_ffc %>%
+#   pivot_longer(cols=!c(Year,gageid),
+#                names_to="ffm",
+#                values_to="value") %>%
+#   rename(year=Year) %>%
+#   mutate(ffc_version="v1.1_api") %>%
+#   filter(!is.na(value))
+# 
+# # save it
+# write_csv(df_ffc_long, file = glue("output/ffc_combined/usgs_{type}_{datatype}_long_run_{runDate}.csv"))
+# write_rds(df_ffc_long, file = glue("output/ffc_combined/usgs_{type}_{datatype}_long_run_{runDate}.rds"), compress = "gz")
+
+
 
