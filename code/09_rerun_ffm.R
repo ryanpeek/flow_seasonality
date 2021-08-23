@@ -1,18 +1,13 @@
-# Visualize and EDA of data
+# Run FFC
+# see this page: https://ceff-tech.github.io/ffc_api_client/articles/getting_started.html
 
 # Libraries -------------------------------------------------------------
 
 library(fs)
 library(glue)
 library(purrr)
-library(viridis)
 library(lubridate)
 library(sf)
-library(plotly)
-library(patchwork)
-library(mapview)
-mapviewOptions(fgb = FALSE)
-
 options(tidyverse.quiet = TRUE)
 library(tidyverse) # load quietly
 library(conflicted) # deals with conflicting functions
@@ -24,130 +19,136 @@ options(scipen = 100) # to print full string instead of sci notation
 #devtools::install_github('ceff-tech/ffc_api_client/ffcAPIClient')
 library(ffcAPIClient)
 
-
-# Data --------------------------------------------------------------------
-
-df_filt <- read_rds("output/csci_wavelet_col_finalsites_filtered.rds")
-df_meta_filt <- read_rds("output/wavelet_colwell_all_sites_filtered.rds")
-
-# Pull Actual Flow Data ---------------------------------------------------
-
-#devtools::install_github("ryanpeek/wateRshedTools")
-
-load("data/usgs_Q_daily_ref_gages_rev.rda") # usgs_flows_ref
-load("data/usgs_Q_daily_alt_gages_rev.rda") # usgs_flows_alt
-
-usgs_flows_ref %>% ungroup() %>% distinct(site_no) %>% tally() # n=219
-usgs_flows_alt %>% ungroup() %>% distinct(site_no) %>% tally() # n=748
-
-# filter to filtered CSCI Paired sites
-flow_ref <- usgs_flows_ref %>% 
-  filter(site_no %in% unique(df_filt$site_id)) %>% 
-  wateRshedTools::add_WYD("date")
-flow_alt <- usgs_flows_alt %>% 
-  filter(site_no %in% unique(df_filt$site_id)) %>% 
-  wateRshedTools::add_WYD("date")
-summary(flow_alt)
-# how many gages?
-flow_ref %>% ungroup() %>% distinct(site_no) %>% tally() # n=55
-flow_alt %>% ungroup() %>% distinct(site_no) %>% tally() # n=137
-
-# Now Run FFC -------------------------------------------------------------
-
 # set/get the token for using the FFC
 ffctoken <- set_token(Sys.getenv("EFLOWS", ""))
 
 # clean up
 ffcAPIClient::clean_account(ffctoken)
 
-# Load Functions ----------------------------------------------------------
+# Load FFC Bulk Functions ----------------------------------------------------------
 
 # these functions written by R. Peek 2020 to facilitate iteration
 
 # this uses the purrr package to loop through and pull ffc data for each gage
 source("code/f_iterate_ffc.R")
 
-# this takes these data and saves them all into a single file/s
-source("code/f_ffc_collapse.R")
+# Data --------------------------------------------------------------------
 
+df_final <- read_rds("output/wavelet_csci_colwell_final.rds")
+df_final %>% distinct(site_id, .keep_all = TRUE) %>% 
+  group_by(gagetype) %>% tally() # ALT = 140, REF=55
 
-# Make Gage List ----------------------------------------------------------
+load("data/usgs_Q_daily_ref_gages_trim.rda") # usgs_flows_ref
+load("data/usgs_Q_daily_alt_gages_trim.rda") # usgs_flows_alt
 
 # make a simple list of gage_id & gageIDName
-gages <- df_filt %>%
-  mutate(site_id_name = paste0("T",site_id)) %>%
-  select(site_id, site_id_name, comid)
+# gages <- df_final %>% 
+#   distinct(site_id, .keep_all = TRUE) %>% 
+#   mutate(site_id_name = paste0("T",site_id)) %>%
+#   select(site_id, site_id_name, comid, gagetype)
+# table(gages$gagetype)
 
-# check flow data associated with years?
-flow_ref %>% group_by(site_no) %>% 
-  summarize(minyr = min(WY),
-            maxyr = max(WY)) %>% 
-  left_join(., df_filt[,c("site_no", "gagetype.y")], by=c("site_id"="site_no"))
-  ggplot() + geom_linerange(aes(x=site_no, ymin=minyr, ymax=maxyr, )) +
-  coord_flip()
-  View()
-# Setup Iteration ---------------------------------------------------------
+# Filter to CSCI Sites Only -----------------------------------------------
 
-# set start date to start WY 1980
-#st_date <- "1979-10-01"
+# REF: filter to filtered CSCI Paired sites
+flow_ref <- usgs_flows_ref_trim %>% 
+  filter(site_no %in% unique(df_final$site_id)) %>% 
+  # add COMID
+  left_join(., df_final %>% select(site_id, comid), by=c("site_no"="site_id")) %>% 
+  rename(flow=Flow)
 
-# RUN! --------------------------------------------------------------------
+# ALT
+flow_alt <- usgs_flows_alt_trim %>% 
+  filter(site_no %in% unique(df_final$site_id)) %>% 
+  # add COMID
+  left_join(., df_final %>% select(site_id, comid), by=c("site_no"="site_id")) %>% 
+  rename(flow=Flow)
+
+# how many gages paired with CSCI?
+flow_ref %>% ungroup() %>% distinct(site_no) %>% tally() # n=55
+flow_alt %>% ungroup() %>% distinct(site_no) %>% tally() # n=140
+
+# Testing FFC Function ------------------------------------------------------
 
 # chunk a set number at a time (and drop sf)
-gagelist <- gages %>% st_drop_geometry() %>% slice(1:5)
+# gagedata_test <- flow_ref %>% 
+#   split(.$site_no) %>% 
+#   .[1:2]  # extract a few to test
+
+# pull just one to test
+# flowseries_df_test <- gagedata_test %>% 
+#   .[1] %>% map_df(., ~.x)
+
+# plot each?
+# map(gagedata_test, ~(ggplot(data=.x) + geom_line(aes(x=date, y=flow)) +
+#                   scale_y_log10()))
+
+# run function
+# ffcs_tst <- map(gagedata_test, ~ffc_possible(flowseries_df = .x,
+#                                     ffctoken=ffctoken,
+#                                     dirToSave="output/ffc_run_tst", 
+#                                     save=TRUE))
+
+# REF: Setup Full Flowseries Data ----------------------------------------------
+
+# chunk a set number at a time
+gagedata_ref <- flow_ref %>% 
+  split(.$site_no)
+
+# REF: RUN FFC --------------------------------------------------------------------
 
 tic() # start time
-ffcs <- gagelist %>%
-  select(site_id, comid) %>% # pull just ID column
-  pmap(.l = ., .f = ~ffc_possible(.x, startDate = st_date, ffctoken=ffctoken, comid=.y, dirToSave="output/ffc_run_alt", save=TRUE)) %>%
-  # add names to list
-  set_names(x = ., nm=gagelist$site_id_name)
+ffcs_ref <- map(gagedata_ref, ~ffc_possible(flowseries_df = .x,
+                                  ffctoken=ffctoken,
+                                  dirToSave="output/ffc_ref_csci", 
+                                  save=TRUE))
 toc() # end time
-
-# for 935 gages (748 with data!)
-## 7047 s (117 min)
+# 383.114 sec elapsed
 
 # see names
-names(ffcs)
+names(ffcs_ref)
 
 # a timestamp: format(Sys.time(), "%Y-%m-%d_%H%M")
 (file_ts <- format(Sys.time(), "%Y%m%d_%H%M"))
 
 # identify missing:
-ffcs %>% keep(is.na(.)) %>% length() # missing 187
+ffcs_ref %>% keep(is.na(.)) %>% length()
 
-# make a list of gages
-miss_gages<-ffcs %>% keep(is.na(.)) %>% names()
+# make a list of missing gages and save out:
+# miss_gages_ref <- ffcs_ref %>% keep(is.na(.)) %>% names()
+# write_lines(miss_gages_ref, file = glue("output/usgs_ffm_alt_missing_gages_{file_ts}.txt"))
 
-# save out missing
-write_lines(miss_gages, file = glue("output/usgs_ffm_alt_missing_gages_{file_ts}.txt"))
+# SAVE: FFC R6 object (only if save=FALSE)
+save(ffcs_ref, file = glue("output/ffc_ref_csci/usgs_ffm_ref_R6_csci_{file_ts}.rda"))
 
-# save out FFC R6 object (only if save=FALSE)
-#save(ffcs, file = glue("output/usgs_ffm_ref_R6_full_{file_ts}.rda"))
+# ALT: Setup Full Flowseries Data ----------------------------------------------
 
-# Follow Up for Missing ----------------------------------------------
+# chunk a set number at a time
+gagedata_alt <- flow_alt %>% 
+  split(.$site_no)
 
-# just look at missing gages here?
+# ALT: RUN FFC --------------------------------------------------------------------
 
-# test
-(tst <-miss_gages[100])
+tic() # start time
+ffcs_alt <- map(gagedata_alt, ~ffc_possible(flowseries_df = .x,
+                                    ffctoken=ffctoken,
+                                    dirToSave="output/ffc_alt_csci", 
+                                    save=TRUE))
+toc() # end time
 
-# get comid if you don't know it for a gage
-gage <- ffcAPIClient::USGSGage$new()
-gage$id <- tst
-gage$get_data()
-gage$get_comid()
-(comid <- gage$comid)
+# see names
+names(ffcs_alt)
 
-# RUN SETUP
-fftst <- FFCProcessor$new()  # make a new object we can use to run the commands
-fftst$fail_years_data = 9
-fftst$gage_start_date = "1979-10-01"
+# a timestamp: format(Sys.time(), "%Y-%m-%d_%H%M")
+(file_ts <- format(Sys.time(), "%Y%m%d_%H%M"))
 
-# if you have comid, add via original usgs_alt dataset
-fftst$set_up(gage_id=tst, comid = comid, token = ffctoken)
-#fftst$set_up(gage_id="09423350", token = ffctoken)
+# identify missing:
+ffcs_alt %>% keep(is.na(.)) %>% length()
 
-# then run
-fftst$run()
+# make a list of missing gages and save out:
+# miss_gages_alt <- ffcs_alt %>% keep(is.na(.)) %>% names()
+# write_lines(miss_gages_alt, file = glue("output/usgs_ffm_alt_missing_gages_{file_ts}.txt"))
+
+# Save Out: FFC R6 object (only if save=FALSE)
+# save(ffcs_alt, file = glue("output/ffc/usgs_ffm_alt_R6_full_{file_ts}.rda"))
 

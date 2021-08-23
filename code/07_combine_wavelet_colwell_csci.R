@@ -105,6 +105,7 @@ df_final <- left_join(df_csci_final, df_wav_max, by="site_id") %>%
 #distinct(site_id, StationCode, SampleID, .keep_all = TRUE)
 
 table(df_final$gagetype, useNA = "ifany") # this version?
+# ALT=305, REF=117
 
 # Plot with Stream Class and Update ---------------------------------------
 
@@ -115,10 +116,9 @@ df_final_sf <- df_final %>%
 mapview(df_final_sf, zcol="gagetype")
 mapview(df_final_sf, zcol="class3_name")
 
-# Fix NAs
+# Streamclass NAs
 # all remaining sites are on east side around Tahoe and Truckee
 table(df_final$class3_name, useNA = "always")
-table(df_final$CLASS, useNA = "always")
 
 # get list of all other gages with NA
 nagages <- df_final %>% filter(is.na(class3_name)) %>% 
@@ -154,7 +154,7 @@ df_final %>%
   geom_point(aes(x=MP_metric, y=csci, fill=class3_name, shape=gagetype),
              alpha=0.8, size=4, show.legend = FALSE) + 
   scale_shape_manual("GageType", values=c(21,22)) +
-  geom_smooth(method = "lm",se = FALSE,
+  geom_smooth(method = "glm",se = FALSE,
               aes(x=MP_metric, y=csci, group=class3_name), col="black", alpha=0.5) +
   #ggthemes::scale_fill_colorblind("GageType") +
   scale_fill_viridis_d("GageType") +
@@ -164,14 +164,13 @@ df_final %>%
 ggsave(filename = "figures/wavelet_vs_csci_by_streamclass_and_period_w_trendline.png", 
        width = 11, height = 8, dpi=300, units = "in")
 
-
 # plot 3: wavelet vs. csci
 df_final %>%  
   ggplot() + 
   geom_point(aes(x=Power.avg, y=csci, fill=class3_name, shape=gagetype),
              alpha=0.8, size=4, show.legend = FALSE) + 
   scale_shape_manual("GageType", values=c(21,22)) +
-  geom_smooth(method = "lm",se = FALSE,
+  geom_smooth(method = "glm",se = FALSE,
               aes(x=Power.avg, y=csci, group=class3_name), col="black", alpha=0.5) +
   #ggthemes::scale_fill_colorblind("GageType") +
   scale_fill_viridis_d("GageType") +

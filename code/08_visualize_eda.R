@@ -15,8 +15,9 @@ mapviewOptions(fgb = FALSE)
 
 # Data --------------------------------------------------------------------
 
-df_filt <- read_rds("output/csci_wavelet_col_finalsites_filtered.rds")
-df_meta_filt <- read_rds("output/wavelet_colwell_all_sites_filtered.rds")
+df_final <- read_rds("output/wavelet_csci_colwell_final.rds")
+df_final %>% distinct(.keep_all = TRUE) %>% 
+  group_by(gagetype) %>% tally() # ALT = 305, REF=117
 
 # Get Wavelets
 load("output/wavelet_combined_period_power_outputs.rda")
@@ -25,67 +26,51 @@ load("output/wavelet_combined_period_power_outputs.rda")
 # df_wav_12: max power at 12 months
 # df_wav_6: max power at 6 months
 
+# Filter Wav above 75% percentile  ----------------------------------
 
-df_wav_max_filt <- 
-  df_wav_max %>% 
-  filter(site_id %in% unique(df_filt$site_id))
-table(df_wav_max_filt$gagetype) # 137 ALT, 55 REF
-
-
-# Filter the 6 month Gages ------------------------------------------------
-
-# filter to just csci paired sites
-df_wav_6 %>% 
-  filter(site_id %in% unique(df_filt$site_id)) -> df_wav_6_csci
-table(df_wav_6_csci$gagetype) # ALT=137, REF=55
-
-# all sites (n=722) filtered to top 25 percent of all sites,
-# then filter to just csci sites
-df_wav_6 %>% ungroup() %>% 
-  filter(Power.avg >= 
-           quantile(round(quantile(df_wav_6$Power.avg, probs = c(0.75)), 2))) %>%
-  filter(site_id %in% unique(df_filt$site_id)) -> df_wav_6_75_csci
+# Filtered to top 25 percent of all sites 
+df_final %>%
+  filter(Power.avg >= round(quantile(df_wav_max$Power.avg, probs = c(0.75)), 2)) %>%
+  filter(site_id %in% unique(df_final$site_id)) -> df_wav_75_csci
 # n=29 sites with strong 6 month pattern (in top 25th percentile)
-table(df_wav_6_75_csci$gagetype) # ALT=20, REF=9
+table(df_wav_75_csci$gagetype) # ALT=35, REF=20
 
 # Pull Actual Flow Data ---------------------------------------------------
 
 #devtools::install_github("ryanpeek/wateRshedTools")
 
-load("data/usgs_Q_daily_ref_gages_rev.rda") # usgs_flows_ref
-load("data/usgs_Q_daily_alt_gages_rev.rda") # usgs_flows_alt
+load("data/usgs_Q_daily_ref_gages_trim.rda") # usgs_flows_ref
+load("data/usgs_Q_daily_alt_gages_trim.rda") # usgs_flows_alt
 
 usgs_flows_ref %>% ungroup() %>% distinct(site_no) %>% tally()
 usgs_flows_alt %>% ungroup() %>% distinct(site_no) %>% tally()
 
 # now filter to data that had a 6 month peak ()
-refdat6 <- usgs_flows_ref %>% 
-  filter(site_no %in% unique(df_wav_6_75_csci$site_id)) %>%
-  wateRshedTools::add_WYD("date")
-altdat6 <- usgs_flows_alt %>% 
-  filter(site_no %in% unique(df_wav_6_75_csci$site_id)) %>% 
-  wateRshedTools::add_WYD("date")
+refdat6 <- usgs_flows_ref_trim %>% 
+  filter(site_no %in% unique(df_wav_75_csci$site_id))
+altdat6 <- usgs_flows_alt_trim %>% 
+  filter(site_no %in% unique(df_wav_75_csci$site_id)) 
 
 # filter to filtered CSCI Paired sites
-refdat <- usgs_flows_ref %>% 
-  filter(site_no %in% unique(df_filt$site_id)) %>% 
-  #left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>% 
-  wateRshedTools::add_WYD("date")
-altdat <- usgs_flows_alt %>% 
-  filter(site_no %in% unique(df_filt$site_id)) %>% 
-  #left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  wateRshedTools::add_WYD("date")
+refdat <- usgs_flows_ref_trim %>% 
+  filter(site_no %in% unique(df_final$site_id)) 
 
+altdat <- usgs_flows_alt_trim %>% 
+  filter(site_no %in% unique(df_final$site_id)) 
+
+length(unique(altdat$site_no))
+length(unique(refdat$site_no))
 
 # MEAN ANN PLOT 6MON by Colwells -------------------------------------------------------
 
 # mean annual
-altdat6 %>% distinct(site_no) %>% nrow() # unfilt: n=20
-altdat6 %>% 
+altdat %>% distinct(site_no) %>% nrow() # unfilt: n=13
+
+altdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_6, by=c("site_no"="site_id")) %>% 
+  left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
+  left_join(., df_wav_max, by=c("site_no"="site_id")) %>%
   ggplot() + 
   theme_bw() +
   # switch color: Power.avg or MP_Metric
@@ -93,16 +78,16 @@ altdat6 %>%
   #geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=MP_metric)) +
   #scale_color_viridis(limits=c(0,10)) + # for Power.avg
   scale_color_viridis(limits=c(0,1)) + # for MP
-  labs(subtitle = "Alt: Mean Annual Discharge (cfs) [n=20], 6 month peak") -> g6_a
+  labs(subtitle = "Alt: Mean Annual Discharge (cfs) [n=140], 6 month peak") -> g6_a
 g6_a
 
-ggplotly(g6_a)
+#ggplotly(g6_a)
 
-refdat6 %>% distinct(site_no) %>% nrow()# n=9
-refdat6 %>% 
+refdat %>% distinct(site_no) %>% nrow()# n=6
+refdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
+  left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
   left_join(., df_wav_6, by=c("site_no"="site_id")) %>% 
   ggplot() + 
   theme_bw() +
@@ -114,7 +99,7 @@ refdat6 %>%
   labs(subtitle = "Ref: Mean Annual Discharge (cfs) [n=9], 6 month peak") -> g6_b
 g6_b
 
-ggplotly(g6_b)
+#ggplotly(g6_b)
 
 # plot together
 g6_a / g6_b
@@ -132,7 +117,7 @@ altdat6 %>% distinct(site_no) %>% nrow() # unfilt: n=20
 altdat6 %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
+  left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
   left_join(., df_wav_6, by=c("site_no"="site_id")) %>% 
   ggplot() + 
   theme_bw() +
@@ -150,7 +135,7 @@ refdat6 %>% distinct(site_no) %>% nrow()# n=9
 refdat6 %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
+  left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
   left_join(., df_wav_6, by=c("site_no"="site_id")) %>% 
   ggplot() + 
   theme_bw() +
@@ -182,8 +167,8 @@ altdat %>% distinct(site_no) %>% nrow() #n=137
 altdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_6_csci, by=c("site_no"="site_id")) %>% 
+  left_join(., df_final[,c("site_id", "csci", "MP_metric", "Power.avg")], by=c("site_no"="site_id")) %>%
+  #left_join(., df_wav_6, by=c("site_no"="site_id")) %>% 
   ggplot() + 
   theme_bw() +
   geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=Power.avg)) +
@@ -196,7 +181,7 @@ refdat %>% distinct(site_no) %>% nrow() #n=55
 refdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_wav_6_csci, by=c("site_no"="site_id")) %>% #View()
+  left_join(., df_wav_max, by=c("site_no"="site_id")) %>% #View()
   ggplot() + 
   theme_bw() +
   geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=Power.avg)) +
@@ -222,8 +207,8 @@ altdat %>% distinct(site_no) %>% nrow() #n=137
 altdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_6_csci, by=c("site_no"="site_id")) %>% 
+  left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
+  left_join(., df_wav_max, by=c("site_no"="site_id")) %>% 
   ggplot() + 
   theme_bw() +
   #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) +
@@ -236,8 +221,8 @@ refdat %>% distinct(site_no) %>% nrow() #n=55
 refdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_6_csci, by=c("site_no"="site_id")) %>% 
+  left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
+  left_join(., df_wav_max, by=c("site_no"="site_id")) %>% 
   ggplot() + 
   theme_bw() +
   #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) +
@@ -265,8 +250,8 @@ altdat %>% distinct(site_no) %>% nrow() #n=137
 altdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_6_csci, by=c("site_no"="site_id")) %>% 
+  left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
+  left_join(., df_wav_max, by=c("site_no"="site_id")) %>% 
   ggplot() + 
   theme_bw() +
   #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) +
@@ -279,8 +264,8 @@ refdat %>% distinct(site_no) %>% nrow() #n=55
 refdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_6_csci, by=c("site_no"="site_id")) %>% 
+  left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
+  left_join(., df_wav_max, by=c("site_no"="site_id")) %>% 
   ggplot() + 
   theme_bw() +
   #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) +
@@ -303,81 +288,53 @@ ggsave(filename = "figures/mean_ann_logflow_alt_ref_12mon_filt_colwell.png",
 
 # Boxplots ----------------------------------------------------------------
 
-# 6 month peaks only (N=29) that were in top 25%
-p6_1 <- df_wav_6_75_csci %>% 
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_id")) %>%
-  ggplot() + geom_boxplot(aes(x=gagetype, y=Power.avg, fill=gagetype))
-p6_2 <- df_wav_6_75_csci %>% 
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_id")) %>%
-  ggplot() + geom_boxplot(aes(x=gagetype, y=MP_metric, fill=gagetype))
-p6_3 <- df_wav_6_75_csci %>% 
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_id")) %>%
-  ggplot() + geom_boxplot(aes(x=gagetype, y=csci, fill=gagetype))
+# # POWER
+(p6_1 <- df_wav_75_csci %>%
+  ggplot() + geom_boxplot(aes(x=gagetype, y=Power.avg, fill=gagetype), show.legend = FALSE) + labs(y="Interannual Seasonality (Power Avg)"))
+
+(p6_2 <- df_wav_75_csci %>% 
+  ggplot() + geom_boxplot(aes(x=gagetype, y=MP_metric, fill=gagetype), show.legend = FALSE))
+
+(p6_3 <- df_wav_75_csci %>% 
+  ggplot() + geom_boxplot(aes(x=gagetype, y=csci, fill=gagetype), show.legend = FALSE))
 
 p6_1 + p6_2 + p6_3
-ggsave(filename = "figures/boxplots_of_6mon_sites.png", width = 11, height = 8, dpi=300)
+
+# ggsave(filename = "figures/boxplots_of_6mon_sites.png", width = 11, height = 8, dpi=300)
 
 # now same plots but with full dataset
-p_1 <- df_wav_max_filt %>% 
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_id")) %>%
-  ggplot() + geom_boxplot(aes(x=gagetype, y=Power.avg, fill=gagetype))
-p_2 <- df_wav_max_filt %>% 
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_id")) %>%
-  ggplot() + geom_boxplot(aes(x=gagetype, y=MP_metric, fill=gagetype))
-p_3 <- df_wav_max_filt %>% 
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_id")) %>%
-  ggplot() + geom_boxplot(aes(x=gagetype, y=csci, fill=gagetype))
+(p_1 <- df_final %>% 
+  ggplot() + geom_boxplot(aes(x=gagetype, y=Power.avg, fill=gagetype), show.legend = FALSE) + labs(y="Interannual Seasonality (Power Avg)"))
+
+(p_2 <- df_final %>% 
+  ggplot() + geom_boxplot(aes(x=gagetype, y=MP_metric, fill=gagetype)) +
+    labs(y="Intrannual Seasonality (Colwell MP)"))
+
+(p_3 <- df_final %>% 
+  ggplot() + geom_boxplot(aes(x=gagetype, y=csci, fill=gagetype)) +
+    labs(y="CSCI"))
 
 p_1 + p_2 + p_3
+
 ggsave(filename = "figures/boxplots_of_csci_sites_max_wav.png", width = 11, height = 8, dpi=300)
 
+# CSCI vs. Seasonality GAM Plots ------------------------------------------
 
+df_final %>% 
+  ggplot() + geom_point(aes(x=csci, y=Power.avg, fill=gagetype), pch=21, size=3) +
+  geom_smooth(aes(x=csci, y=Power.avg, color=gagetype), method = "gam") +
+  scale_fill_viridis_d() + scale_color_viridis_d() +
+  labs(y="Interannual Seasonality \n(Wavelet Power Avg)") -> gg_gam_poweravg
 
-# GAM Plots ---------------------------------------------------------------
+(df_final %>% filter(Period < 20) %>% 
+    ggplot() + geom_point(aes(y=csci, x=Period, fill=gagetype), pch=21, size=3.5) +
+    geom_smooth(aes(y=csci, x=Power.avg, color=gagetype), method = "gam") +
+    scale_fill_viridis_d() + scale_color_viridis_d() -> gg_gam_period)
 
-
-df_wav_max_filt %>% 
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_id")) %>%
-  ggplot() + geom_point(aes(x=csci, y=Power.avg, fill=gagetype), pch=21) +
-  geom_smooth(aes(x=csci, y=Power.avg, fill=gagetype), method = "gam")
-
-
-df_wav_max_filt %>% 
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_id")) %>%
-  ggplot() + geom_point(aes(x=csci, y=Period, fill=gagetype), pch=21) +
-  geom_smooth(aes(x=csci, y=Period, fill=gagetype), method = "gam") +
-  scale_y_continuous(limits=c(0,32))
-
-
-df_wav_max_filt %>% 
-  left_join(., df_filt[,c("site_id", "csci", "MP_metric")], by=c("site_id")) %>%
+df_final %>% 
   ggplot() + geom_point(aes(x=csci, y=MP_metric, fill=gagetype), pch=21) +
-  geom_smooth(aes(x=csci, y=MP_metric, fill=gagetype), method = "gam") 
+  geom_smooth(aes(x=csci, y=MP_metric, color=gagetype), method = "gam") +
+  scale_fill_viridis_d() + scale_color_viridis_d() +
+  labs(y="Intrannual Seasonality (Colwell MP)") -> gg_gam_mp
 
-
-
-# Stream Classes ----------------------------------------------------------
-
-ceff_strmclass <- st_read("data/eflows_final_classification_9CLASS/Final_Classification_9CLASS.shp")
-
-# crosswalk
-strmclass_xwalk <- tibble("CLASS"=c(1,2,3,4,5,6,7,8,9), "CLASS_NAME"=c("snowmelt","high-volume snowmelt and rain", "low-volume snowmelt and rain", "winter storms","groundwater","perennial groundwater and rain","flashy, ephemeral rain","rain and seasonal groundwater","high elevation low precipitation"))
-
-# join with class names
-ceff_strmclass <- left_join(ceff_strmclass, strmclass_xwalk)
-st_crs(ceff_strmclass)$epsg
-
-# collapse stream classes:
-ceff_strmclass <- ceff_strmclass %>% 
-  mutate(class_simple = case_when(
-    
-  ))
-
-
-## Spatial Join ------------------------------------------------------------
-
-# make diff proj
-# df_meta_filt_class <- df_meta_filt %>% st_transform(3310)
-# ceff_strmclass <- ceff_strmclass %>% st_transform(3310) %>%
-#   st_zm()
-# df_meta_filt_class <- st_join(df_meta_filt_class, ceff_strmclass, st_is_within_distance, dist = 100)
+gg_gam_poweravg / gg_gam_period / gg_gam_mp
