@@ -17,3 +17,5 @@ data/eflows_final_classification_9CLASS/Final_Classification_9Class*
 
 
 output/.Rapp.history
+output/ffc_ref_csci/
+output/ffc_alt_csci/
