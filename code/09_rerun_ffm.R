@@ -45,7 +45,7 @@ load("data/usgs_Q_daily_alt_gages_trim.rda") # usgs_flows_alt
 # make a simple list of gage_id & gageIDName
 gages <- df_final %>%
   distinct(site_id, .keep_all = TRUE) %>%
-  select(site_id, comid, gagetype, station_nm, usgs_lat, usgs_lon, MP_metric, class3_id, class3_name, CLASS_NAME)
+  select(site_id, comid, gagetype, station_nm, lat, lon, MP_metric, class3_id, class3_name, CLASS_NAME)
 table(gages$gagetype)
 
 # Filter to CSCI Sites Only -----------------------------------------------
@@ -151,8 +151,6 @@ ffcs_alt %>% keep(is.na(.)) %>% length()
 
 # Save Out: FFC R6 object (only if save=FALSE)
 save(ffcs_alt, file = glue("output/ffc_alt_csci/usgs_ffm_alt_R6_full_{file_ts}.rda"))
-
-
 
 # Combine FFC -------------------------------------------------------------
 
@@ -273,7 +271,7 @@ ffc_combine_alt_ref <- function(datatype, fdir){
 
 
 # set the data type:
-datatype <- "predicted_percentiles"
+datatype <- "ffc_percentiles" # ffc_percentiles or predicted_percentiles
 
 # combine
 df_ffc <- ffc_combine_alt_ref(datatype, fdir = ffc_dir)

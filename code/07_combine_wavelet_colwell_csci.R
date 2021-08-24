@@ -24,12 +24,12 @@ length(unique(df_colwell$site_no)) # n=738
 # Get CSCI Data ------------------------------------------------------
 
 # CSCI
-csci_trim <- read_rds("data/02c_selected_final_bmi_csci_dat_trim.rds")
-csci_trim %>% st_drop_geometry() %>% 
-  #distinct(StationCode, site_id, .keep_all = TRUE) %>% nrow() # 431
-  #distinct(StationCode, .keep_all = TRUE) %>% nrow() # 246 CSCI sites
-  distinct(site_id, .keep_all = TRUE) %>% nrow() # 209 CSCI sites
-table(csci_trim$CEFF_type, useNA = "ifany") # n=527 alt, n=193 REF
+# csci_trim <- read_rds("data/02c_selected_final_bmi_csci_dat_trim.rds")
+# csci_trim %>% st_drop_geometry() %>% 
+#   #distinct(StationCode, site_id, .keep_all = TRUE) %>% nrow() # 431
+#   #distinct(StationCode, .keep_all = TRUE) %>% nrow() # 246 CSCI sites
+#   distinct(site_id, .keep_all = TRUE) %>% nrow() # 209 CSCI sites
+# table(csci_trim$CEFF_type, useNA = "ifany") # n=527 alt, n=193 REF
 
 csci_por <- read_rds("data/02c_selected_final_bmi_csci_dat.rds") %>% 
   distinct(StationCode, SampleID, site_id, .keep_all = TRUE) %>% 
@@ -78,7 +78,7 @@ csci_por_colwell <- left_join(csci_por, df_colwell, by=c("site_id"="site_no")) %
 table(csci_por_colwell$gagetype)
 
 # ALT REF 
-# 293 114 
+# 293 114 # but includes replicate CSCI samples
 
 # Join Colwell with StreamClass -------------------------------------------
 
@@ -88,49 +88,92 @@ load("output/eflows_streamclasses.rda")
 # JOIN with csci_por_colwell by COMID
 df_csci_final <- left_join(st_drop_geometry(csci_por_colwell), ceff_strmclass, by=c("COMID_nhd"="COMID")) %>% select(-station_nm.y) %>% 
   rename(station_nm = station_nm.x) %>% 
-  distinct(.keep_all = TRUE)
-table(df_csci_final$class3_name, useNA = "ifany") # 90 NAs, from eastside
-table(df_csci_final$gagetype, useNA = "ifany") # ALT 305, REF 117, 65 NAs
-
-# drop NAs 
-df_csci_final <- df_csci_final %>% 
+  distinct(.keep_all = TRUE) %>% 
   filter(!is.na(gagetype))
+df_csci_final %>% distinct(site_id, .keep_all = TRUE) %>% 
+  group_by(gagetype) %>% tally()
+
+# add correct streamclass:
+df_csci_final_sf <- df_csci_final %>% st_as_sf(coords=c("lon", "lat"), crs=4269, remove=FALSE) 
+
+# need to add streamclass for missing tahoe sites
+tahoe_strmclass <- st_read("data/eflows_final_classification_9CLASS/Final_Classification_9CLASS_tahoe.shp") %>% st_transform(4269)
+
+# crosswalk
+strmclass_xwalk <- tibble(
+  "CLASS"=c(1,2,3,4,5,6,7,8,9), 
+  "CLASS_NAME"=c("snowmelt", # 3 class: 1=SNOWMELT
+                 "high-volume snowmelt and rain", # 3 class: 2=MIXED
+                 "low-volume snowmelt and rain", # 3 class: 2=MIXED,
+                 "winter storms", # 3 class: 3=RAIN
+                 "groundwater", # 3 class: 2=MIXED
+                 "perennial groundwater and rain", # 3 class: 3=RAIN
+                 "flashy, ephemeral rain", # 3 class: 3=RAIN
+                 "rain and seasonal groundwater", # 3 class: 3=RAIN
+                 "high elevation low precipitation"), # 3 class: 1=SNOWMELT
+  "class3_name" = c("SNOWMELT",
+                    "MIXED","MIXED","RAIN","MIXED",
+                    "RAIN","RAIN","RAIN",
+                    "SNOWMELT"),
+  "class3_id" = c(1,
+                  2,2,3,2,
+                  3,3,3,
+                  1))
+
+# join with class names
+tahoe_strmclass <- left_join(tahoe_strmclass, strmclass_xwalk)
+
+# map
+# mapview(df_csci_final_sf, zcol="class3_name") + mapview(tahoe_strmclass, zcol="class3_name")
+
+# Here we join only the NAs and then clean up
+df_csci_final_sf_nas_only <- df_csci_final_sf %>% filter(is.na(class3_name)) %>% 
+  select(-c(CLASS:class3_id))
+
+# NAs
+df_csci_na_classes <- st_join(df_csci_final_sf_nas_only, left = FALSE, 
+                              tahoe_strmclass[,c("CLASS","REACHCODE","CLASS_NAME", 
+                                                 "class3_name", "class3_id")], 
+                              join=st_nearest_feature) 
+
+table(df_csci_na_classes$class3_name, useNA = "ifany")  
+summary(df_csci_na_classes)
+
+# bind back together
+df_csci_final_v2 <- df_csci_final_sf %>% filter(!is.na(class3_name)) %>% 
+  bind_rows(., df_csci_na_classes)
+
+table(df_csci_final_v2$class3_name, useNA = "ifany")
+table(df_csci_final_v2$gagetype, useNA = "ifany") # ALT 305, REF 117
 
 # Join Colwell with Wavelet -----------------------------------------------
 
-df_final <- left_join(df_csci_final, df_wav_max, by="site_id") %>%
+df_final <- left_join(df_csci_final_v2 %>% st_drop_geometry(), df_wav_max, by="site_id") %>%
   ungroup() %>% 
   select(-gagetype.x) %>% 
   rename(gagetype=gagetype.y)
 #distinct(site_id, StationCode, SampleID, .keep_all = TRUE)
 
-table(df_final$gagetype, useNA = "ifany") # this version?
-# ALT=305, REF=117
+df_final %>% distinct(site_id, .keep_all=TRUE) %>% group_by(gagetype) %>% tally()
+# matches!!
 
 # Plot with Stream Class and Update ---------------------------------------
 
 # make sf and plot
 df_final_sf <- df_final %>% 
-  st_as_sf(coords=c("lon", "lat"), crs=4269, remove=FALSE)
+  st_as_sf(coords=c("usgs_lon", "usgs_lat"), crs=4269, remove=FALSE)
 
 mapview(df_final_sf, zcol="gagetype")
 mapview(df_final_sf, zcol="class3_name")
 
-# Streamclass NAs
-# all remaining sites are on east side around Tahoe and Truckee
 table(df_final$class3_name, useNA = "always")
+# MIXED     RAIN SNOWMELT  
+#  95      277       50
 
-# get list of all other gages with NA
-nagages <- df_final %>% filter(is.na(class3_name)) %>% 
-  distinct(site_id) %>% pull # only 27 unique sites
-
-# assign all to low-vol snowmelt and rain??
 
 ## Seasonality vs. Predict by StreamClass for -------
 
-table(df_final$gagetype, useNA = "always")
-
-df_final %>%  filter(!is.na(class3_name)) %>% 
+df_final %>%
   ggplot() + 
   geom_point(aes(x=MP_metric, y=Power.avg, fill=gagetype, 
                  shape=gagetype), alpha=0.8)+
@@ -145,7 +188,7 @@ df_final %>%  filter(!is.na(class3_name)) %>%
   theme_classic(base_family = "Roboto Condensed") +
   facet_wrap(.~class3_name)
 
-ggsave(filename = "figures/wavelet_vs_colwell_by_streamclass_and_period.png", 
+ggsave(filename = "figures/wavelet_vs_colwell_by_streamclass_and_period_glm.png", 
        width = 11, height = 8, dpi=300, units = "in")
 
 # plot 2: colwell vs. csci

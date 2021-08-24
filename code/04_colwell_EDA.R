@@ -20,7 +20,9 @@ load("data/usgs_Q_daily_ref_gages_trim.rda") # nrow=2442511
 gage_alt_meta <- usgs_flows_alt_trim %>% distinct(site_no, .keep_all=TRUE) %>% 
   select(site_no,station_nm:flowcnt) # n=517
 gage_ref_meta <- usgs_flows_ref_trim %>% distinct(site_no, .keep_all=TRUE) %>% 
-  select(site_no,station_nm:flowcnt) # n=221
+  select(site_no,station_nm, usgs_lat, usgs_lon, huc8, parm_cd, stat_cd, 
+         ref_yr_start, ref_yr_end, ref_por_range, yr_begin, yr_end, yr_total, 
+         gagetype, parm_cd:flowcnt) # n=221
 
 # bind rows
 gage_metadata <- bind_rows(gage_alt_meta, gage_ref_meta)
@@ -47,7 +49,7 @@ df_colwell_ref <- df_ref %>%
   map(., ~hydrostats::Colwells(.x)) %>% 
   map(., ~tibble(MP_metric=c(.x[["MP"]]))) %>%
   bind_rows() %>% 
-  mutate(site_no = gage_alt_meta$site_no,
+  mutate(site_no = gage_ref_meta$site_no,
          gagetype = "REF")
 
 # standardize
@@ -175,6 +177,13 @@ ggsave(filename = "figures/colwells_ref_alt_vs_csci_gam_trend.png", width = 10, 
 # see "3_color_classes_gages_legend"
 ceff_strmclass <- st_read("data/eflows_final_classification_9CLASS/Final_Classification_9CLASS.shp")
 
+# # this has tahoe but doesn't have COMIDs!!!
+# ceff_strmclass_tahoe <- st_read("data/eflows_final_classification_9CLASS/Final_Classification_9CLASS_tahoe.shp")
+# 
+# # clip to just tahoe:
+# ceff_tahoe <- st_intersection(ceff_strmclass_tahoe, ceff_strmclass)
+# mapview(ceff_tahoe)
+
 # crosswalk
 strmclass_xwalk <- tibble(
   "CLASS"=c(1,2,3,4,5,6,7,8,9), 
@@ -198,16 +207,39 @@ strmclass_xwalk <- tibble(
 
 # join with class names
 ceff_strmclass <- left_join(ceff_strmclass, strmclass_xwalk)
+table(ceff_strmclass$class3_name, useNA="ifany")
+
+# map:
+# library(mapview)
+# mapview(ceff_strmclass, zcol="class3_name")
+
+# save out
+save(ceff_strmclass, file="output/eflows_streamclasses.rda", compress = "gzip")
+
+# make full dataset sf and spatial Join
+# csci_por_colwell <- csci_por_colwell %>% 
+#   st_as_sf(coords=c("usgs_lon", "usgs_lat"), crs=4269, remove=FALSE) %>% 
+#   st_transform(3310) %>% st_zm()
+  
+# transform streamclass
+# ceff_strmclass <- ceff_strmclass %>% st_transform(3310) %>% st_zm()
 
 # add streamclass name
-df_final <- left_join(csci_por_colwell, ceff_strmclass, by=c("comid_gage"="COMID")) %>% 
-  distinct(.keep_all=TRUE) %>% 
-  #most NAs are likely SNOWMelt driven, lump for now?
+# df_final <- st_join(csci_por_colwell, ceff_strmclass, join= st_is_within_distance, dist=10) %>% 
+#   distinct(.keep_all=TRUE)
+#df_final <- st_join(csci_por_colwell, ceff_strmclass, dist=100) %>% 
+#  distinct(.keep_all=TRUE)
+
+df_final <- left_join(csci_por_colwell, ceff_strmclass %>% st_drop_geometry(),
+                      by=c("comid_gage"="COMID")) %>%
+  distinct(.keep_all=TRUE)
+table(df_final$class3_name, useNA = "ifany")
+
+df_final <- df_final %>% 
   mutate(class3_name = case_when(
     is.na(class3_name) ~ "SNOWMELT",
     TRUE ~ class3_name
   ))
-table(df_final$class3_name, useNA = "ifany")
 
 
 # 11: PLOT GAGETYPE BY STREAMCLASS ------------------------------------------
@@ -235,5 +267,5 @@ ggsave(filename = "figures/seasonality_colwell_by_streamclass3_alt_gam.png",
 # 12: Save Out ----------------------------------------------------------------
 
 write_rds(df_final, file = "output/usgs_gages_colwells_w_streamclass_metric.rds")
-save(ceff_strmclass, file="output/eflows_streamclasses.rda", compress = "gz")
+
 write_csv(strmclass_xwalk, file="output/eflows_streamclasses_xwalk_3class.csv")
