@@ -1,5 +1,5 @@
 # evaluate ffc metrics that work for both
-
+ 
 library(fs)
 library(glue)
 library(purrr)
@@ -73,8 +73,9 @@ df_ffc_perc %>% filter(is.na(p50)) %>% select(gageid, gagetype) %>% distinct()
 # predicted?
 df_ffc_pred %>% filter(is.na(p50)) %>% select(gageid, gagetype) %>% distinct() # zero
 df_ffc_pred %>% distinct(gageid, .keep_all=TRUE) %>% group_by(gagetype) %>% tally()
+# matches 140 ALT, 55 REF
 
-# not all metrics have values?
+# not all metrics have values? (should be 193, but some only 170)
 df_ffc_pred %>% group_by(metric) %>% tally() %>% View()
 
 # list of metrics that didn't/couldn't get calculated for everything
@@ -142,6 +143,16 @@ df_comb_final %>% distinct(gageid, .keep_all = TRUE) %>%
 # how many metrics?
 df_comb_final %>% distinct(metric, gageid, .keep_all = TRUE) %>% 
   group_by(gageid) %>% tally() # 16 metrics, 193 gages
+
+df_comb_final %>% distinct(metric, .keep_all = TRUE) %>% 
+  group_by(metric) %>% 
+  tally() %>% 
+  pull(metric)
+
+# "DS_Dur_WS"      "DS_Mag_50"      "DS_Mag_90"      "DS_Tim"         "FA_Mag"        
+# "FA_Tim"         "Peak_10"        "Peak_2"         "Peak_5"         "SP_Dur"        
+# "SP_Mag"         "SP_Tim"         "Wet_BFL_Dur"    "Wet_BFL_Mag_10" "Wet_BFL_Mag_50"
+# "Wet_Tim"
 
 # save out
 write_rds(df_comb_final, file="output/ffc_filtered_final_combined.rds")
