@@ -76,100 +76,78 @@ table(gages_meta$gagetype)
 csci_por_colwell <- left_join(csci_por, df_colwell, by=c("site_id"="site_no")) %>%
   distinct(StationCode, site_id, .keep_all=TRUE)
 table(csci_por_colwell$gagetype)
+csci_por_colwell %>% distinct(site_id, .keep_all = TRUE) %>% 
+  group_by(gagetype) %>% tally()
 
 # ALT REF 
 # 293 114 # but includes replicate CSCI samples
-
+# some NA's
+# ALT REF
+# 140 55
 # Join Colwell with StreamClass -------------------------------------------
 
 # get streamclass
-load("output/eflows_streamclasses.rda")
+ceff_strmclass <- read_rds("data/eflows_final_classification_9CLASS/ca_stream_class3-9_final.rds")
+
+# tally:
+csci_por_colwell %>% st_drop_geometry() %>% 
+  distinct(site_id, .keep_all = TRUE) %>% 
+  dplyr::select(gagetype) %>% table( useNA = "always")
+
 
 # JOIN with csci_por_colwell by COMID
-df_csci_final <- left_join(st_drop_geometry(csci_por_colwell), ceff_strmclass, by=c("COMID_nhd"="COMID")) %>% select(-station_nm.y) %>% 
+df_csci_final <- left_join(st_drop_geometry(csci_por_colwell), 
+                           st_drop_geometry(ceff_strmclass), 
+                           by=c("comid"="COMID")) %>% 
+  select(-station_nm.y) %>% 
   rename(station_nm = station_nm.x) %>% 
   distinct(.keep_all = TRUE) %>% 
-  filter(!is.na(gagetype))
-df_csci_final %>% distinct(site_id, .keep_all = TRUE) %>% 
-  group_by(gagetype) %>% tally()
+  filter(!is.na(gagetype)) %>% 
+  #fix some NAs
+  mutate(class3_name = case_when(
+    is.na(class3_name) ~ "RAIN",
+    TRUE ~ class3_name),
+    class3_id = case_when(
+      is.na(class3_id) ~ 3,
+      TRUE ~ class3_id)
+  )
 
-# add correct streamclass:
-df_csci_final_sf <- df_csci_final %>% st_as_sf(coords=c("lon", "lat"), crs=4269, remove=FALSE) 
+# summarize
+df_csci_final %>% 
+  distinct(site_id, .keep_all = TRUE) %>% 
+  select(gagetype) %>% table( useNA = "always")
+df_csci_final %>% 
+  distinct(site_id, .keep_all = TRUE) %>% 
+  select(class3_name) %>% table( useNA = "always")
 
-# need to add streamclass for missing tahoe sites
-tahoe_strmclass <- st_read("data/eflows_final_classification_9CLASS/Final_Classification_9CLASS_tahoe.shp") %>% st_transform(4269)
-
-# crosswalk
-strmclass_xwalk <- tibble(
-  "CLASS"=c(1,2,3,4,5,6,7,8,9), 
-  "CLASS_NAME"=c("snowmelt", # 3 class: 1=SNOWMELT
-                 "high-volume snowmelt and rain", # 3 class: 2=MIXED
-                 "low-volume snowmelt and rain", # 3 class: 2=MIXED,
-                 "winter storms", # 3 class: 3=RAIN
-                 "groundwater", # 3 class: 2=MIXED
-                 "perennial groundwater and rain", # 3 class: 3=RAIN
-                 "flashy, ephemeral rain", # 3 class: 3=RAIN
-                 "rain and seasonal groundwater", # 3 class: 3=RAIN
-                 "high elevation low precipitation"), # 3 class: 1=SNOWMELT
-  "class3_name" = c("SNOWMELT",
-                    "MIXED","MIXED","RAIN","MIXED",
-                    "RAIN","RAIN","RAIN",
-                    "SNOWMELT"),
-  "class3_id" = c(1,
-                  2,2,3,2,
-                  3,3,3,
-                  1))
-
-# join with class names
-tahoe_strmclass <- left_join(tahoe_strmclass, strmclass_xwalk)
+# make spatial
+df_csci_final_sf <- df_csci_final %>% 
+  st_as_sf(coords=c("usgs_lon", "usgs_lat"), crs=4269, remove=FALSE) 
 
 # map
-# mapview(df_csci_final_sf, zcol="class3_name") + mapview(tahoe_strmclass, zcol="class3_name")
+mapviewOptions(platform = "leaflet") # change for attributes
+mapview(df_csci_final_sf, zcol="class3_name", burst=TRUE)
 
-# Here we join only the NAs and then clean up
-df_csci_final_sf_nas_only <- df_csci_final_sf %>% filter(is.na(class3_name)) %>% 
-  select(-c(CLASS:class3_id))
+mapviewOptions(platform = "mapdeck") # change for faster map
+mapview(df_csci_final_sf, zcol="class3_name") + 
+  mapview(ceff_strmclass, zcol="class3_name")
 
-# NAs
-df_csci_na_classes <- st_join(df_csci_final_sf_nas_only, left = FALSE, 
-                              tahoe_strmclass[,c("CLASS","REACHCODE","CLASS_NAME", 
-                                                 "class3_name", "class3_id")], 
-                              join=st_nearest_feature) 
-
-table(df_csci_na_classes$class3_name, useNA = "ifany")  
-summary(df_csci_na_classes)
-
-# bind back together
-df_csci_final_v2 <- df_csci_final_sf %>% filter(!is.na(class3_name)) %>% 
-  bind_rows(., df_csci_na_classes)
-
-table(df_csci_final_v2$class3_name, useNA = "ifany")
-table(df_csci_final_v2$gagetype, useNA = "ifany") # ALT 305, REF 117
+# double check
+table(df_csci_final_sf$class3_name, useNA = "ifany") # 89 mixed, 269 rain, 52 snowmelt
+table(df_csci_final_sf$gagetype, useNA = "ifany") # ALT 294, REF 116
 
 # Join Colwell with Wavelet -----------------------------------------------
 
-df_final <- left_join(df_csci_final_v2 %>% st_drop_geometry(), df_wav_max, by="site_id") %>%
+# join with 12 month value
+df_final <- left_join(df_csci_final, df_wav_12, by="site_id") %>%
   ungroup() %>% 
   select(-gagetype.x) %>% 
   rename(gagetype=gagetype.y)
 #distinct(site_id, StationCode, SampleID, .keep_all = TRUE)
 
-df_final %>% distinct(site_id, .keep_all=TRUE) %>% group_by(gagetype) %>% tally()
+df_final %>% distinct(site_id, .keep_all=TRUE) %>% 
+  select(gagetype) %>% table(useNA = "always")
 # matches!!
-
-# Plot with Stream Class and Update ---------------------------------------
-
-# make sf and plot
-df_final_sf <- df_final %>% 
-  st_as_sf(coords=c("usgs_lon", "usgs_lat"), crs=4269, remove=FALSE)
-
-mapview(df_final_sf, zcol="gagetype")
-mapview(df_final_sf, zcol="class3_name")
-
-table(df_final$class3_name, useNA = "always")
-# MIXED     RAIN SNOWMELT  
-#  95      277       50
-
 
 ## Seasonality vs. Predict by StreamClass for -------
 
@@ -188,7 +166,7 @@ df_final %>%
   theme_classic(base_family = "Roboto Condensed") +
   facet_wrap(.~class3_name)
 
-ggsave(filename = "figures/wavelet_vs_colwell_by_streamclass_and_period_glm.png", 
+ggsave(filename = "figures/wavelet_vs_colwell_by_streamclass_glm.png", 
        width = 11, height = 8, dpi=300, units = "in")
 
 # plot 2: colwell vs. csci
@@ -204,7 +182,7 @@ df_final %>%
   theme_classic(base_family = "Roboto Condensed") +
   facet_wrap(gagetype~class3_name)
 
-ggsave(filename = "figures/wavelet_vs_csci_by_streamclass_and_period_w_trendline.png", 
+ggsave(filename = "figures/colwell_vs_csci_by_streamclass_w_trendline.png", 
        width = 11, height = 8, dpi=300, units = "in")
 
 # plot 3: wavelet vs. csci
@@ -220,6 +198,8 @@ df_final %>%
   theme_classic(base_family = "Roboto Condensed") +
   facet_wrap(gagetype~class3_name)
 
+ggsave(filename = "figures/wavelet_vs_csci_by_streamclass_w_trendline.png", 
+       width = 11, height = 8, dpi=300, units = "in")
 
 # Save Data Out -----------------------------------------------------------
 
