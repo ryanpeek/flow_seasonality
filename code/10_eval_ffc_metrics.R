@@ -28,28 +28,36 @@ load("data/usgs_Q_daily_alt_gages_trim.rda") # usgs_flows_alt
 flow_ref <- usgs_flows_ref_trim %>% 
   filter(site_no %in% unique(df_csci$site_id)) %>% 
   # add COMID
-  left_join(., df_csci %>% select(site_id, comid), by=c("site_no"="site_id")) %>% 
+  left_join(., df_csci %>% 
+              select(site_id, comid, SampleID, csci, 
+                     MP_metric, class3_name, CLASS_NAME, Power.avg), 
+            by=c("site_no"="site_id")) %>% 
   rename(flow=Flow)
 
 # ALT
 flow_alt <- usgs_flows_alt_trim %>% 
   filter(site_no %in% unique(df_csci$site_id)) %>% 
   # add COMID
-  left_join(., df_csci %>% select(site_id, comid), by=c("site_no"="site_id")) %>% 
+  left_join(., df_csci %>% select(site_id, comid, SampleID, csci, 
+                                  MP_metric, class3_name, CLASS_NAME, Power.avg),
+            by=c("site_no"="site_id")) %>% 
   rename(flow=Flow)
 
 # make a simple list of gage_id & gageIDName
 gages <- df_csci %>%
   distinct(site_id, .keep_all = TRUE) %>%
-  select(site_id, comid, gagetype, station_nm, lat, lon, MP_metric, class3_id, class3_name, CLASS_NAME)
+  select(site_id, comid, gagetype, station_nm, lat, lon, MP_metric, 
+         class3_id, class3_name,  CLASS_NAME)
 summary(gages)
 
 # Data --------------------------------------------------------------------
 
 datatype <- "predicted_percentiles" # ffc_percentiles
-df_ffc_pred <- read_rds(glue("output/ffc_meta_combined_{datatype}.rds"))
+df_ffc_pred <- read_rds(glue("output/ffc_meta_combined_{datatype}.rds")) %>% 
+  select(-c(MP_metric:CLASS_NAME))
 datatype <- "ffc_percentiles"
-df_ffc_perc <- read_rds(glue("output/ffc_meta_combined_{datatype}.rds"))
+df_ffc_perc <- read_rds(glue("output/ffc_meta_combined_{datatype}.rds")) %>% 
+  select(-c(MP_metric:CLASS_NAME))
 
 # Find out What Metrics work across Both ----------------------------------
 
@@ -94,7 +102,7 @@ unique(df_ffc_perc$metric)[!unique(df_ffc_perc$metric) %in% unique(df_ffc_pred$m
 
 # join the observed percentiles to predicted and find gages that are missing (or have missing data)
 
-df_comb <- df_ffc_perc %>% select(p50, metric:CLASS_NAME) %>% 
+df_comb <- df_ffc_perc %>% select(p50, metric:lon) %>% 
   filter(!metric %in% c("Peak_Tim_10", "Peak_Tim_2", "Peak_Tim_5")) %>% 
   rename(p50_obs=p50) %>% 
   left_join(., df_ffc_pred %>% select(p50, metric, gageid), by=c("metric", "gageid")) %>% 
@@ -154,5 +162,14 @@ df_comb_final %>% distinct(metric, .keep_all = TRUE) %>%
 # "SP_Mag"         "SP_Tim"         "Wet_BFL_Dur"    "Wet_BFL_Mag_10" "Wet_BFL_Mag_50"
 # "Wet_Tim"
 
+# how many unique site pairs: (N=407)
+df_csci %>% group_by(site_id, SampleID) %>% tally()
+
+# JOIN WITH csci/colwell/wavelet
+df_ffc_final <- inner_join(df_comb_final, df_csci %>% select(-c(lat, lon, gagetype, station_nm)), by=c("gageid"="site_id", "comid")) %>% 
+  distinct(gageid, SampleID, metric, .keep_all = TRUE)
+
+
 # save out
-write_rds(df_comb_final, file="output/ffc_filtered_final_combined.rds")
+write_rds(df_ffc_final, file="output/ffc_filtered_final_combined.rds")
+
