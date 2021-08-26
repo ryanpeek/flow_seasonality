@@ -17,7 +17,7 @@ mapviewOptions(fgb = FALSE)
 
 df_final <- read_rds("output/wavelet_csci_colwell_final.rds")
 df_final %>% distinct(.keep_all = TRUE) %>% 
-  group_by(gagetype) %>% tally() # ALT = 305, REF=117
+  group_by(gagetype) %>% tally() # ALT = 294, REF=116
 
 # Get Wavelets
 load("output/wavelet_combined_period_power_outputs.rda")
@@ -33,7 +33,7 @@ df_final %>%
   filter(Power.avg >= round(quantile(df_wav_max$Power.avg, probs = c(0.75)), 2)) %>%
   filter(site_id %in% unique(df_final$site_id)) -> df_wav_75_csci
 # n=29 sites with strong 6 month pattern (in top 25th percentile)
-table(df_wav_75_csci$gagetype) # ALT=35, REF=20
+table(df_wav_75_csci$gagetype) # ALT=35, REF=24
 
 # Pull Actual Flow Data ---------------------------------------------------
 
@@ -61,42 +61,41 @@ altdat <- usgs_flows_alt_trim %>%
 length(unique(altdat$site_no))
 length(unique(refdat$site_no))
 
-# MEAN ANN PLOT 6MON by Colwells -------------------------------------------------------
+# MEAN ANN PLOT 12MON by Colwells -------------------------------------------------------
 
 # mean annual
-altdat %>% distinct(site_no) %>% nrow() # unfilt: n=13
+altdat %>% distinct(site_no) %>% nrow() # unfilt: n=140
 
 altdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
   left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_max, by=c("site_no"="site_id")) %>%
+  left_join(., df_wav_12, by=c("site_no"="site_id")) %>%
   ggplot() + 
   theme_bw() +
   # switch color: Power.avg or MP_Metric
-  geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) + 
-  #geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=MP_metric)) +
+  #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) + 
+  geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=MP_metric)) +
   #scale_color_viridis(limits=c(0,10)) + # for Power.avg
-  scale_color_viridis(limits=c(0,1)) + # for MP
-  labs(subtitle = "Alt: Mean Annual Discharge (cfs) [n=140], 6 month peak") -> g6_a
+  scale_color_viridis("Colwell (MP)",limits=c(0,1)) + # for MP
+  labs(subtitle = "Alt: Mean Annual Discharge (cfs) [n=140], 12 month peak") -> g6_a
 g6_a
 
-#ggplotly(g6_a)
 
-refdat %>% distinct(site_no) %>% nrow()# n=6
+refdat %>% distinct(site_no) %>% nrow()# n=55
 refdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
   left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_6, by=c("site_no"="site_id")) %>% 
+  left_join(., df_wav_12, by=c("site_no"="site_id")) %>% 
   ggplot() + 
   theme_bw() +
   # switch color: Power.avg or MP_Metric
-  geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) + 
-  #geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=MP_metric)) +
+  #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) + 
+  geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=MP_metric)) +
   #scale_color_viridis(limits=c(0,10)) + # for Power.avg
-  scale_color_viridis(limits=c(0,1)) + # for MP
-  labs(subtitle = "Ref: Mean Annual Discharge (cfs) [n=9], 6 month peak") -> g6_b
+  scale_color_viridis("Colwell (MP)", limits=c(0,1)) + # for MP
+  labs(subtitle = "Ref: Mean Annual Discharge (cfs) [n=55], 12 month peak") -> g6_b
 g6_b
 
 #ggplotly(g6_b)
@@ -104,143 +103,53 @@ g6_b
 # plot together
 g6_a / g6_b
 
-ggsave(filename = "figures/mean_ann_flow_alt_ref_6mon_filt_75_colwells.png", 
+ggsave(filename = "figures/mean_ann_flow_alt_ref_12mon_colwells.png", 
        width = 11, height = 8, dpi=300)
 
-ggsave(filename = "figures/mean_ann_logflow_alt_ref_6mon_filt_75_colwells.png", 
+ggsave(filename = "figures/mean_ann_logflow_alt_ref_12mon_colwells.png", 
        width = 11, height = 8, dpi=300)
 
 
 ## now by wavelet -------------------------------------------
 # mean annual
-altdat6 %>% distinct(site_no) %>% nrow() # unfilt: n=20
-altdat6 %>% 
+altdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
   left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_6, by=c("site_no"="site_id")) %>% 
+  left_join(., df_wav_12, by=c("site_no"="site_id")) %>% 
   ggplot() + 
   theme_bw() +
   # switch color: Power.avg or MP_Metric
-  #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=Power.avg)) + 
-  geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=Power.avg)) +
-  scale_color_viridis(limits=c(0,10)) + # for Power.avg
+  geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=Power.avg)) + 
+  #geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=Power.avg)) +
+  scale_color_viridis("Wavelet \nPower", limits=c(0,15)) + # for Power.avg
   #scale_color_viridis(limits=c(0,1)) + # for MP
-  labs(subtitle = "Alt: Mean Annual Discharge (cfs) [n=20], 6 month peak") -> g6_a
+  labs(subtitle = "Alt: Mean Annual Discharge (cfs) [n=155], 12 month peak") -> g6_a
 g6_a
 
-ggplotly(g6_a)
 
-refdat6 %>% distinct(site_no) %>% nrow()# n=9
-refdat6 %>% 
+refdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
   left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_6, by=c("site_no"="site_id")) %>% 
+  left_join(., df_wav_12, by=c("site_no"="site_id")) %>% 
   ggplot() + 
   theme_bw() +
   # switch color: Power.avg or MP_Metric
-  #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=Power.avg)) + 
-  geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=Power.avg)) +
-  scale_color_viridis(limits=c(0,10)) + # for Power.avg
-  labs(subtitle = "Ref: Mean Annual Discharge (cfs) [n=9], 6 month peak") -> g6_b
+  geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=Power.avg)) + 
+  #geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=Power.avg)) +
+  scale_color_viridis("Wavelet \nPower",limits=c(0,15)) + # for Power.avg
+  labs(subtitle = "Ref: Mean Annual Discharge (cfs) [n=55], 12 month peak") -> g6_b
 g6_b
-
-ggplotly(g6_b)
 
 # plot together
 g6_a / g6_b
 
-ggsave(filename = "figures/mean_ann_flow_alt_ref_6mon_filt_75_wav.png", 
+ggsave(filename = "figures/mean_ann_flow_alt_ref_12mon_wav.png", 
        width = 11, height = 8, dpi=300)
 
-ggsave(filename = "figures/mean_ann_logflow_alt_ref_6mon_filt_75_wav.png", 
+ggsave(filename = "figures/mean_ann_logflow_alt_ref_12mon_wav.png", 
        width = 11, height = 8, dpi=300)
-
-
-
-
-# MEAN ANN Max Wavelet Score for All CSCI Sites ---------------------------
-
-# mean annual
-altdat %>% distinct(site_no) %>% nrow() #n=137
-altdat %>% 
-  group_by(site_no, DOWY) %>% 
-  summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_final[,c("site_id", "csci", "MP_metric", "Power.avg")], by=c("site_no"="site_id")) %>%
-  #left_join(., df_wav_6, by=c("site_no"="site_id")) %>% 
-  ggplot() + 
-  theme_bw() +
-  geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=Power.avg)) +
-  #geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=Power.avg)) +
-  scale_color_viridis(limits=c(0,10)) +
-  labs(subtitle = "Alt: Mean Annual Discharge (cfs) [n=137]") -> g12_a
-g12_a
-
-refdat %>% distinct(site_no) %>% nrow() #n=55 
-refdat %>% 
-  group_by(site_no, DOWY) %>% 
-  summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_wav_max, by=c("site_no"="site_id")) %>% #View()
-  ggplot() + 
-  theme_bw() +
-  geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=Power.avg)) +
-  #geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=Power.avg)) +
-  #scale_color_viridis(limits=c(6, 17)) +
-  scale_color_viridis() +
-  labs(subtitle = "Ref: Mean Annual Discharge (cfs) [n=55]") -> g12_b
-g12_b
-
-# plot together
-g12_a / g12_b
-
-ggsave(filename = "figures/mean_ann_flow_alt_ref_12mon_filt_.png", 
-       width = 11, height = 8, dpi=300)
-
-ggsave(filename = "figures/mean_ann_logflow_alt_ref_12mon_period_filt.png", 
-       width = 11, height = 8, dpi=300)
-
-## Now by Colwell's -------------------------------------------------------
-
-# mean annual
-altdat %>% distinct(site_no) %>% nrow() #n=137
-altdat %>% 
-  group_by(site_no, DOWY) %>% 
-  summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_max, by=c("site_no"="site_id")) %>% 
-  ggplot() + 
-  theme_bw() +
-  #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) +
-  geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=MP_metric)) +
-  scale_color_viridis(limits=c(0, 1)) +
-  labs(subtitle = "Alt: Mean Annual Discharge (cfs) [n=137] 12 mon") -> g12_a
-g12_a
-
-refdat %>% distinct(site_no) %>% nrow() #n=55 
-refdat %>% 
-  group_by(site_no, DOWY) %>% 
-  summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_max, by=c("site_no"="site_id")) %>% 
-  ggplot() + 
-  theme_bw() +
-  #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) +
-  geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=MP_metric)) +
-  #scale_color_viridis(limits=c(6, 17)) +
-  scale_color_viridis(limits=c(0, 1)) +
-  labs(subtitle = "Ref: Mean Annual Discharge (cfs) [n=55] 12 mon") -> g12_b
-g12_b
-
-# plot together
-g12_a / g12_b
-
-ggsave(filename = "figures/mean_ann_flow_alt_ref_12mon_filt_colwell.png", 
-       width = 11, height = 8, dpi=300)
-
-ggsave(filename = "figures/mean_ann_logflow_alt_ref_12mon_filt_colwell.png", 
-       width = 11, height = 8, dpi=300)
-
 
 
 # More Plots? By CSCI? -------------------------------------------------------------
@@ -251,13 +160,13 @@ altdat %>%
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
   left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_max, by=c("site_no"="site_id")) %>% 
+  left_join(., df_wav_12, by=c("site_no"="site_id")) %>% 
   ggplot() + 
   theme_bw() +
-  #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) +
-  geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=csci)) +
-  scale_color_viridis(limits=c(0, 1)) +
-  labs(subtitle = "Alt: Mean Annual Discharge (cfs) [n=137] 12 mon") -> g12_a
+  geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=csci)) +
+  #geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=csci)) +
+  scale_color_viridis(limits=c(0, 1.2)) +
+  labs(subtitle = "Alt: Mean Annual Discharge (cfs) [n=140] 12 mon") -> g12_a
 g12_a
 
 refdat %>% distinct(site_no) %>% nrow() #n=55 
@@ -265,76 +174,104 @@ refdat %>%
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
   left_join(., df_final[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
-  left_join(., df_wav_max, by=c("site_no"="site_id")) %>% 
+  left_join(., df_wav_12, by=c("site_no"="site_id")) %>% 
   ggplot() + 
   theme_bw() +
-  #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) +
-  geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=csci)) +
+  geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=csci)) +
+  #geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=csci)) +
   #scale_color_viridis(limits=c(6, 17)) +
-  scale_color_viridis(limits=c(0, 1.1)) +
+  scale_color_viridis(limits=c(0, 1.2)) +
   labs(subtitle = "Ref: Mean Annual Discharge (cfs) [n=55] 12 mon") -> g12_b
 g12_b
 
 # plot together
 g12_a / g12_b
 
-ggsave(filename = "figures/mean_ann_flow_alt_ref_12mon_filt_colwell.png", 
+ggsave(filename = "figures/mean_ann_flow_alt_ref_12mon_csci.png", 
        width = 11, height = 8, dpi=300)
 
-ggsave(filename = "figures/mean_ann_logflow_alt_ref_12mon_filt_colwell.png", 
+ggsave(filename = "figures/mean_ann_logflow_alt_ref_12mon_csci.png", 
        width = 11, height = 8, dpi=300)
-
 
 
 # Boxplots ----------------------------------------------------------------
 
 # # POWER
-(p6_1 <- df_wav_75_csci %>%
-  ggplot() + geom_boxplot(aes(x=gagetype, y=Power.avg, fill=gagetype), show.legend = FALSE) + labs(y="Interannual Seasonality (Power Avg)"))
+(p12_1 <- ggplot(data=df_final, aes(x=gagetype, y=Power.avg)) + 
+   geom_jitter(data=df_final, aes(x=gagetype, y=Power.avg), 
+               pch=16, size=2, color="gray40", 
+               show.legend = FALSE, alpha=0.5) +
+   geom_boxplot(data=df_final, aes(x=gagetype, y=Power.avg, fill=gagetype), 
+                show.legend = FALSE, alpha=0.8) + 
+   labs(y="Interannual Seasonality (Power Avg)", x="") +
+   scale_y_log10() +
+   theme_classic() +
+   scale_fill_viridis_d(option = "E", direction = -1) +
+   geom_signif(comparisons = list(c("REF", "ALT")),
+               map_signif_level=TRUE))
 
-(p6_2 <- df_wav_75_csci %>% 
-  ggplot() + geom_boxplot(aes(x=gagetype, y=MP_metric, fill=gagetype), show.legend = FALSE))
+(p12_2 <- ggplot(data=df_final, aes(x=gagetype, y=MP_metric)) + 
+    geom_jitter(data=df_final, aes(x=gagetype, y=MP_metric), 
+                pch=16, size=2, color="gray40", 
+                show.legend = FALSE, alpha=0.5) +
+    geom_boxplot(data=df_final, aes(x=gagetype, y=MP_metric, fill=gagetype), 
+                 show.legend = FALSE, alpha=0.8) +
+    labs(y="Intra-annual Seasonality (Colwell's M/P)", x="") +
+    theme_classic() +
+    scale_y_log10() + 
+    scale_fill_viridis_d(option = "E", direction = -1) +
+    geom_signif(comparisons = list(c("REF", "ALT")),
+                map_signif_level=TRUE))
 
-(p6_3 <- df_wav_75_csci %>% 
-  ggplot() + geom_boxplot(aes(x=gagetype, y=csci, fill=gagetype), show.legend = FALSE))
+(p12_3 <- ggplot(data=df_final, aes(x=gagetype, y=csci)) + 
+    geom_jitter(data=df_final, aes(x=gagetype, y=csci), 
+                pch=16, size=2, color="gray40", 
+                show.legend = FALSE, alpha=0.5) +
+    geom_boxplot(data=df_final, aes(x=gagetype, y=csci, fill=gagetype), 
+                 show.legend = FALSE, alpha=0.8) +
+    labs(y="CSCI", x="") +
+    theme_classic() +
+    scale_y_log10() + 
+    scale_fill_viridis_d(option = "E", direction = -1) +
+    geom_signif(comparisons = list(c("REF", "ALT")),
+                map_signif_level=TRUE))
 
-p6_1 + p6_2 + p6_3
+p12_1 + p12_2 + p12_3
 
-# ggsave(filename = "figures/boxplots_of_6mon_sites.png", width = 11, height = 8, dpi=300)
+ggsave(filename = "figures/boxplots_of_12mon_wav_col_csci.png", width = 11, height = 8, dpi=300)
 
-# now same plots but with full dataset
-(p_1 <- df_final %>% 
-  ggplot() + geom_boxplot(aes(x=gagetype, y=Power.avg, fill=gagetype), show.legend = FALSE) + labs(y="Interannual Seasonality (Power Avg)"))
+# add sig: install.packages("ggpubr")
+# library(ggpubr)
+# ggboxplot(data=df_final, x = "gagetype", y="Power.avg", 
+#           fill="gagetype", add="jitter", alpha=0.7,
+#           palette = viridis(n=2, direction = -1, option="E")) +
+#   stat_compare_means(comparisons = list(c("ALT","REF"))) 
 
-(p_2 <- df_final %>% 
-  ggplot() + geom_boxplot(aes(x=gagetype, y=MP_metric, fill=gagetype)) +
-    labs(y="Intrannual Seasonality (Colwell MP)"))
-
-(p_3 <- df_final %>% 
-  ggplot() + geom_boxplot(aes(x=gagetype, y=csci, fill=gagetype)) +
-    labs(y="CSCI"))
-
-p_1 + p_2 + p_3
-
-ggsave(filename = "figures/boxplots_of_csci_sites_max_wav.png", width = 11, height = 8, dpi=300)
 
 # CSCI vs. Seasonality GAM Plots ------------------------------------------
 
 df_final %>% 
   ggplot() + geom_point(aes(x=csci, y=Power.avg, fill=gagetype), pch=21, size=3) +
   geom_smooth(aes(x=csci, y=Power.avg, color=gagetype), method = "gam") +
-  scale_fill_viridis_d() + scale_color_viridis_d() +
+  scale_fill_viridis_d("GageType", option="E", direction = -1) + 
+  scale_y_log10() +
+  scale_color_viridis_d("GageType",option="E", direction = -1) +
+  theme_classic()+
   labs(y="Interannual Seasonality \n(Wavelet Power Avg)") -> gg_gam_poweravg
-
-(df_final %>% filter(Period < 20) %>% 
-    ggplot() + geom_point(aes(y=csci, x=Period, fill=gagetype), pch=21, size=3.5) +
-    geom_smooth(aes(y=csci, x=Power.avg, color=gagetype), method = "gam") +
-    scale_fill_viridis_d() + scale_color_viridis_d() -> gg_gam_period)
+gg_gam_poweravg
 
 df_final %>% 
-  ggplot() + geom_point(aes(x=csci, y=MP_metric, fill=gagetype), pch=21) +
-  geom_smooth(aes(x=csci, y=MP_metric, color=gagetype), method = "gam") +
-  scale_fill_viridis_d() + scale_color_viridis_d() +
+  ggplot() + geom_point(aes(x=csci, y=MP_metric, fill=gagetype), pch=21, size=3, show.legend = FALSE) +
+  geom_smooth(aes(x=csci, y=MP_metric, color=gagetype), method = "gam", show.legend = FALSE) +
+  scale_fill_viridis_d(option="E", direction = -1) + 
+  #scale_y_log10() +
+  scale_color_viridis_d(option="E", direction = -1) +
+  theme_classic()+
   labs(y="Intrannual Seasonality (Colwell MP)") -> gg_gam_mp
+gg_gam_mp
 
-gg_gam_poweravg / gg_gam_period / gg_gam_mp
+gg_gam_mp / gg_gam_poweravg
+gg_gam_mp + gg_gam_poweravg
+
+ggsave(filename = "figures/trendfit_gam_col_wav_vs_csci.png", width = 11, height = 8.5, 
+       dpi=300)
