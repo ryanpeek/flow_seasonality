@@ -8,7 +8,8 @@ library(glue)
 library(tidylog)
 library(ggdark)
 library(sf)
-
+library(mapview)
+mapviewOptions(fgb=FALSE)
 
 # 01: Import Flow/GAGE Data -----------------------------------------------
 
@@ -124,7 +125,7 @@ df_colwell_all_meta %>%
 
 ggsave(filename = "figures/boxplot_notched_colwells_ref_alt.png", width = 10, height = 8, dpi = 300, units = "in")
 
-# 07: BRING IN CSCI -------------------------------------------------------
+# 07A: IMPORT CSCI -------------------------------------------------------
 
 # bring in data:
 csci_trim <- read_rds("data/02c_selected_final_bmi_csci_dat_trim.rds")
@@ -140,7 +141,17 @@ csci_por <- read_rds("data/04_selected_csci_ffm_por_trim.rds") %>%
   distinct(StationCode, SampleID, site_id, .keep_all=TRUE)
 table(csci_por$CEFF_type, useNA = "ifany") # n=521 alt, n=193 REF
 
-# 08: JOIN COLWELL AND CSCI -----------------------------------------------
+
+# 07B: IMPORT ASCI ------------------------------------------------------------
+
+asci_trim <- read_rds("https://github.com/ksirving/asci_ffm_2019/blob/master/output_data/06_asci_por_trim_final_dataset.rds?raw=true") %>% st_drop_geometry() %>% 
+  select(StationCode:HUC_12, CEFF_type, 
+         site_id, comid_gage, site_id_nm = station_nm,
+         SampleID:YYYY) %>%  
+  distinct(StationCode, SampleID, site_id, .keep_all=TRUE)
+table(asci_trim$CEFF_type)
+
+# 08: JOIN WITH COLWELL AND ASCI/CSCI -----------------------------------------------
 
 # join w seasonality:
 csci_trim_colwell <- left_join(csci_trim, df_colwell_all_meta, by=c("site_id"="site_no")) %>%
@@ -154,6 +165,15 @@ csci_por_colwell <- left_join(csci_por, df_colwell_all_meta, by=c("site_id"="sit
   filter(!is.na(gagetype))
 
 table(csci_por_colwell$gagetype, useNA = "ifany") # alt 430, ref 193
+
+# ASCI
+asci_colwell <- left_join(asci_trim, df_colwell_all_meta, by=c("site_id"="site_no")) %>%
+  distinct(StationCode, SampleID, site_id, .keep_all=TRUE) %>% 
+  # drop crap gages (canals etc)
+  filter(!is.na(gagetype))
+
+  
+table(asci_colwell$gagetype, useNA = "ifany") # n=260
 
 # 09: GAM PLOT ---------------------------------------------------------------
 
@@ -171,82 +191,65 @@ csci_por_colwell %>%
 
 ggsave(filename = "figures/colwells_ref_alt_vs_csci_gam_trend.png", width = 10, height = 8, dpi = 300, units = "in")
 
+# ASCI vs GAGETYPE
+asci_colwell %>% 
+  ggplot() + 
+  geom_point(aes(y=MP_metric, x=H_ASCI, fill=gagetype), pch=21, size=2.7, alpha=0.9) +
+  stat_smooth(aes(y=MP_metric, x=H_ASCI, color=gagetype), 
+              method = "gam") +
+  theme_classic(base_family = "Roboto Condensed") +
+  scale_color_viridis_d(option = "B", "Gage Type") +
+  scale_fill_viridis_d(option = "A", "Gage Type") +
+  labs(y="Intra-annual Seasonality \n(Colwell's M/P)", x="ASCI",
+       caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)")
+
+ggsave(filename = "figures/colwells_alt_vs_asci_gam_trend.png", width = 10, height = 8, dpi = 300, units = "in")
+
+
 # 10: ADD STREAM CLASSES -----------------------------------------------
 
-# get stream class and combine into 9 class and 3 class Xwalks 
-# see "3_color_classes_gages_legend"
-ceff_strmclass <- st_read("data/eflows_final_classification_9CLASS/Final_Classification_9CLASS.shp")
+# get stream classes: 
+load("data/eflows_final_classification_9CLASS/ca_stream_class3-9_final.rda") # strm_class_final
 
-# # this has tahoe but doesn't have COMIDs!!!
-# ceff_strmclass_tahoe <- st_read("data/eflows_final_classification_9CLASS/Final_Classification_9CLASS_tahoe.shp")
-# 
-# # clip to just tahoe:
-# ceff_tahoe <- st_intersection(ceff_strmclass_tahoe, ceff_strmclass)
-# mapview(ceff_tahoe)
-
-# crosswalk
-strmclass_xwalk <- tibble(
-  "CLASS"=c(1,2,3,4,5,6,7,8,9), 
-  "CLASS_NAME"=c("snowmelt", # 3 class: 1=SNOWMELT
-                 "high-volume snowmelt and rain", # 3 class: 2=MIXED
-                 "low-volume snowmelt and rain", # 3 class: 2=MIXED,
-                 "winter storms", # 3 class: 3=RAIN
-                 "groundwater", # 3 class: 2=MIXED
-                 "perennial groundwater and rain", # 3 class: 3=RAIN
-                 "flashy, ephemeral rain", # 3 class: 3=RAIN
-                 "rain and seasonal groundwater", # 3 class: 3=RAIN
-                 "high elevation low precipitation"), # 3 class: 1=SNOWMELT
-  "class3_name" = c("SNOWMELT",
-                    "MIXED","MIXED","RAIN","MIXED",
-                    "RAIN","RAIN","RAIN",
-                    "SNOWMELT"),
-  "class3_id" = c(1,
-                  2,2,3,2,
-                  3,3,3,
-                  1))
-
-# join with class names
-ceff_strmclass <- left_join(ceff_strmclass, strmclass_xwalk)
-table(ceff_strmclass$class3_name, useNA="ifany")
-
-# map:
-# library(mapview)
-# mapview(ceff_strmclass, zcol="class3_name")
-
-# save out
-save(ceff_strmclass, file="output/eflows_streamclasses.rda", compress = "gzip")
-
-# make full dataset sf and spatial Join
-# csci_por_colwell <- csci_por_colwell %>% 
-#   st_as_sf(coords=c("usgs_lon", "usgs_lat"), crs=4269, remove=FALSE) %>% 
-#   st_transform(3310) %>% st_zm()
-  
-# transform streamclass
-# ceff_strmclass <- ceff_strmclass %>% st_transform(3310) %>% st_zm()
-
-# add streamclass name
-# df_final <- st_join(csci_por_colwell, ceff_strmclass, join= st_is_within_distance, dist=10) %>% 
-#   distinct(.keep_all=TRUE)
-#df_final <- st_join(csci_por_colwell, ceff_strmclass, dist=100) %>% 
-#  distinct(.keep_all=TRUE)
-
-df_final <- left_join(csci_por_colwell, ceff_strmclass %>% st_drop_geometry(),
+# CSCI
+csci_final <- left_join(csci_por_colwell, strm_class_final %>% st_drop_geometry(),
                       by=c("comid_gage"="COMID")) %>%
   distinct(.keep_all=TRUE)
-table(df_final$class3_name, useNA = "ifany")
 
-df_final <- df_final %>% 
+table(csci_final$class3_name, useNA = "ifany")
+
+csci_final <- csci_final %>% 
   mutate(class3_name = case_when(
     is.na(class3_name) ~ "SNOWMELT",
     TRUE ~ class3_name
   ))
 
+# ASCI
+asci_final <- left_join(asci_colwell, 
+                        strm_class_final %>% st_drop_geometry(),
+                        by=c("comid_gage"="COMID")) %>%
+  distinct(.keep_all=TRUE)
+
+table(asci_final$class3_name, useNA = "ifany")
+
+asci_final %>% st_as_sf(coords=c("usgs_lon", "usgs_lat"), crs=4269, remove=F) %>% mapview(zcol="class3_name", burst=TRUE)
+
+mapview::mapview(asci_final)
+
+
+asci_final <- asci_final %>% 
+  mutate(class3_name = case_when(
+    is.na(class3_name) ~ "RAIN",
+    TRUE ~ class3_name
+  ))
+
+table(asci_final$gagetype, useNA = "always")
+
 
 # 11: PLOT GAGETYPE BY STREAMCLASS ------------------------------------------
 
-
 # CSCI vs GAGETYPE
-df_final %>% 
+csci_final %>% 
   ggplot() + 
   geom_point(aes(y=MP_metric, x=csci, fill=gagetype), pch=21, size=2.7, alpha=0.9) +
   stat_smooth(aes(y=MP_metric, x=csci, color=gagetype),
@@ -264,8 +267,34 @@ ggsave(filename = "figures/seasonality_colwell_by_streamclass3_alt_glm.png",
 ggsave(filename = "figures/seasonality_colwell_by_streamclass3_alt_gam.png",
        width=11, height = 8, dpi=300)
 
+
+# ASCI vs GAGETYPE
+asci_final %>% 
+  ggplot() + 
+  geom_point(aes(y=MP_metric, x=H_ASCI, fill=gagetype), pch=21, size=2.7, alpha=0.9) +
+  stat_smooth(aes(y=MP_metric, x=H_ASCI, color=gagetype),
+              method = "gam", se = F) +
+  theme_classic(base_family = "Roboto Condensed") +
+  ggthemes::scale_color_few(palette = "Medium", "Gage Type") +
+  ggthemes::scale_fill_few(palette = "Medium", "Gage Type") +
+  #scale_fill_viridis_d(option = "A", "StreamClass") +
+  labs(y="Seasonality (Colwell's M/P)", x="ASCI",
+       caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)") +
+  facet_wrap(.~class3_name)
+
+ggsave(filename = "figures/seasonality_colwell_by_streamclass3_alt_asci_glm.png",
+       width=11, height = 8, dpi=300)
+ggsave(filename = "figures/seasonality_colwell_by_streamclass3_alt_asci_gam.png",
+       width=11, height = 8, dpi=300)
+
+
+
+
 # 12: Save Out ----------------------------------------------------------------
 
-write_rds(df_final, file = "output/usgs_gages_colwells_w_streamclass_metric.rds")
+write_rds(csci_final, file = "output/usgs_gages_colwells_w_streamclass_metric.rds")
+
+write_rds(asci_final, file = "output/usgs_gages_asci_colwells_w_streamclass_metric.rds")
+
 
 write_csv(strmclass_xwalk, file="output/eflows_streamclasses_xwalk_3class.csv")
