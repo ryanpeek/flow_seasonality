@@ -14,7 +14,9 @@ output/wavelets/alt/*csv
 output/wavelets/ref/wavelet_model*.rda
 output/wavelets/alt/wavelet_model*.rda
 data/eflows_final_classification_9CLASS/Final_Classification_9Class*
-
+docs/*html
+output/*html
+figures/*html
 
 output/.Rapp.history
 output/ffc_ref_csci/

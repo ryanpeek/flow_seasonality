@@ -122,7 +122,7 @@ ggplot() +
 # Save Wavelets -----------------------------------------------------------
 
 # save wavelet pieces
-save(df_wav, df_wav_6, df_wav_12, df_wav_max, file="output/wavelet_combined_period_power_outputs.rda")
+save(df_wav, df_wav_6, df_wav_12, df_wav_max, file="output/06_wavelet_combined_period_power_outputs.rda")
 
 #load("output/wavelet_combined_period_power_outputs.rda")
 

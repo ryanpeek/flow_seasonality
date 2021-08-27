@@ -287,14 +287,10 @@ ggsave(filename = "figures/seasonality_colwell_by_streamclass3_alt_asci_glm.png"
 ggsave(filename = "figures/seasonality_colwell_by_streamclass3_alt_asci_gam.png",
        width=11, height = 8, dpi=300)
 
-
-
-
 # 12: Save Out ----------------------------------------------------------------
 
-write_rds(csci_final, file = "output/usgs_gages_colwells_w_streamclass_metric.rds")
+write_rds(csci_final, file = "output/04_gages_csci_colwells_w_streamclass_metric.rds")
 
-write_rds(asci_final, file = "output/usgs_gages_asci_colwells_w_streamclass_metric.rds")
+write_rds(asci_final, file = "output/04_gages_asci_colwells_w_streamclass_metric.rds")
 
 
-write_csv(strmclass_xwalk, file="output/eflows_streamclasses_xwalk_3class.csv")

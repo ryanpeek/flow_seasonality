@@ -52,6 +52,9 @@ strmclass_xwalk <- tibble(
                   3,3,3,
                   1))
 
+write_csv(strmclass_xwalk, file="output/eflows_streamclasses_xwalk_3class.csv")
+
+
 # Join --------------------------------------------------------------------
 
 # join with class names
@@ -158,7 +161,7 @@ summary(strm_class_final)
 strm_class_final <- strm_class_final %>% select(-rowid)
 
 # write it out!
-save(strm_class_final, file="output/ca_stream_class3-9_final.rda")
+save(strm_class_final, file="data/eflows_final_classification_9CLASS/ca_stream_class3-9_final.rda")
 
 write_rds(strm_class_final, file = "data/eflows_final_classification_9CLASS/ca_streamclass3-9_final.rds")
 
