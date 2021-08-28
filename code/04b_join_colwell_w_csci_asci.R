@@ -16,7 +16,7 @@ mapviewOptions(fgb=FALSE)
 df_colwell_all_meta <- read_rds("output/04_usgs_gages_colwells_metric.rds")
 
 
-# 07A: IMPORT CSCI -------------------------------------------------------
+# 01A: IMPORT CSCI -------------------------------------------------------
 
 # bring in data:
 csci_trim <- read_rds("data/02c_selected_final_bmi_csci_dat_trim.rds")
@@ -35,12 +35,15 @@ table(csci_por$CEFF_type, useNA = "ifany") # n=521 alt, n=193 REF
 
 # 07B: IMPORT ASCI ------------------------------------------------------------
 
-asci_trim <- read_rds("https://github.com/ksirving/asci_ffm_2019/blob/master/output_data/02c_selected_final_algae_asci_dat_trim.rds?raw=true") #%>% st_drop_geometry() %>% 
+asci_trim <- read_rds("https://github.com/ksirving/asci_ffm_2019/blob/master/output_data/02c_selected_final_algae_asci_dat_trim.rds?raw=true") %>% st_drop_geometry() %>% 
 select(StationCode:HUC_12, CEFF_type, 
        site_id, comid_gage=comid, Latitude, Longitude, 
        SampleID:YYYY) %>%  
   distinct(StationCode, SampleID, site_id, .keep_all=TRUE)
 table(asci_trim$CEFF_type, useNA = "ifany") # n=303 alt, 102 REF
+
+# save out
+asci_trim <- write_rds(asci_trim, file = "output/asci_trim.rds")
 
 # 08: JOIN WITH COLWELL AND ASCI/CSCI -----------------------------------------------
 
@@ -110,10 +113,13 @@ load("data/eflows_final_classification_9CLASS/ca_stream_class3-9_final.rda") # s
 # CSCI
 csci_final <- left_join(csci_por_colwell, strm_class_final %>% st_drop_geometry(),
                         by=c("comid_gage"="COMID")) %>%
+  select(-c(metric:comid_ffc, MM, DD, YYYY, COMID_nhd, COMID)) %>%
+  rename(COMID_bio=COMID_bmi) %>% 
   distinct(.keep_all=TRUE)
 
 table(csci_final$class3_name, useNA = "ifany")
 
+# fix missing (NA) values (check with mapview)
 csci_final <- csci_final %>% 
   mutate(class3_name = case_when(
     is.na(class3_name) ~ "SNOWMELT",
@@ -124,14 +130,18 @@ csci_final <- csci_final %>%
 asci_final <- left_join(asci_colwell, 
                         strm_class_final %>% st_drop_geometry(),
                         by=c("comid_gage"="COMID")) %>%
+  select(-YYYY, sampledate=SampleDate, longitude=Longitude,
+         latitude=Latitude, COMID_bio=COMID_algae) %>% 
+  mutate(COMID_bio = as.numeric(COMID_bio)) %>% 
   distinct(.keep_all=TRUE)
 
 table(asci_final$class3_name, useNA = "ifany")
 
 # NAs?
-asci_final %>% st_as_sf(coords=c("usgs_lon", "usgs_lat"), crs=4269, remove=F) %>% mapview(zcol="class3_name", burst=TRUE) #+ 
+#asci_final %>% st_as_sf(coords=c("usgs_lon", "usgs_lat"), crs=4269, remove=F) %>% mapview(zcol="class3_name", burst=TRUE) #+ 
 #mapview(strm_class_final, zcol="class3_name")
 
+# fix based on mapview
 asci_final <- asci_final %>% 
   mutate(class3_name = case_when(
     site_id %in% c("11048553") ~ "SNOWMELT",
@@ -139,8 +149,14 @@ asci_final <- asci_final %>%
     TRUE ~ class3_name
   ))
 
+# double check!
 table(asci_final$gagetype, useNA = "always")
 table(asci_final$class3_name, useNA = "always")
+
+# compare names and clean:
+library(janitor)
+compare_df_cols(asci_final, csci_final)
+
 
 # 11: PLOT GAGETYPE BY STREAMCLASS ------------------------------------------
 
@@ -185,8 +201,8 @@ ggsave(filename = "figures/seasonality_colwell_by_streamclass3_alt_asci_gam.png"
 
 # 12: Save Out ----------------------------------------------------------------
 
-write_rds(csci_final, file = "output/04_gages_csci_colwells_w_streamclass_metric.rds")
+write_rds(csci_final, file = "output/04b_gages_csci_colwells_w_streamclass_metric.rds")
 
-write_rds(asci_final, file = "output/04_gages_asci_colwells_w_streamclass_metric.rds")
+write_rds(asci_final, file = "output/04b_gages_asci_colwells_w_streamclass_metric.rds")
 
 

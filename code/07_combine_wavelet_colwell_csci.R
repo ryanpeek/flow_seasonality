@@ -15,8 +15,8 @@ mapviewOptions(fgb = FALSE)
 # Get Colwell Data ------------------------------------------------------
 
 # Get Colwell
-df_csci <- read_rds("output/04_gages_csci_colwells_w_streamclass_metric.rds")
-df_asci <- read_rds("output/04_gages_asci_colwells_w_streamclass_metric.rds")
+df_csci <- read_rds("output/04b_gages_csci_colwells_w_streamclass_metric.rds")
+df_asci <- read_rds("output/04b_gages_asci_colwells_w_streamclass_metric.rds")
 
 df_csci %>%
   distinct(site_id, .keep_all = TRUE) %>% 
@@ -54,9 +54,10 @@ usgs_daily_alt <- read_csv("data/usgs_metadata_alt_gages.csv")
 usgs_daily_ref <- read_csv("data/usgs_metadata_ref_gages.csv") %>% 
   mutate(site_id = as.character(site_id))
 gages_meta <- bind_rows(usgs_daily_alt, usgs_daily_ref) %>% 
-  filter(site_id %in% gagelist)
-rm(usgs_daily_alt, usgs_daily_ref)
+  filter(site_id %in% gagelist) # filter to just the bio sites
+rm(usgs_daily_alt, usgs_daily_ref) # rm temp files
 
+# how many total unique gages?
 table(gages_meta$gagetype) # ALT 164, REF 68
 
 # Join Colwell with Wavelet -----------------------------------------------
@@ -91,21 +92,26 @@ df_asci_final %>%
 
 janitor::compare_df_cols(df_asci_final, df_csci_final)
 
+# only a few diff cols: csci, csci_percentile, H_ASCI, mmi, 
+
 df_final <- bind_rows(df_asci_final %>% 
-                        select(-c(YYYY, class3_id, CEFF_type)) %>% 
-                        rename(
-                               sampledate=SampleDate, asci=H_ASCI) %>% 
+                        select(-c(class3_id, CEFF_type, flowdays, flowcnt, Period_rnd)) %>% 
+                        rename(asci=H_ASCI) %>% 
                         mutate(bioindicator="ASCI"), 
-                      df_csci_final %>% st_drop_geometry() %>%  
-                        select(-c(YYYY, MM, DD, COMID, 
-                                  comid_ffc, COMID_nhd, alteration_type,
-                                  mmi, median_in_iqr, metric, 
-                                  status, status_code, class3_id, CEFF_type)) %>% 
+                      df_csci_final %>%  
+                        select(-c(class3_id, CEFF_type, flowdays, flowcnt, Period_rnd)) %>% 
                         mutate(bioindicator="CSCI"))
 
 # combine csci/asci col:
-df_final <- df_final %>% mutate(biovalue=coalesce(asci, csci)) %>% 
-  select(StationCode:comid_gage, station_nm:class3_name, SampleID, sampledate, bioindicator, biovalue, asci, csci, csci_percentile, COMID_algae, COMID_bmi, MP_metric, Power.avg:Period_rnd)
+df_final <- df_final %>% 
+  mutate(biovalue=coalesce(asci, csci),
+         class3_name = as.factor(class3_name),
+         gagetype = as.factor(gagetype),
+         bioindicator = as.factor(bioindicator)) %>% 
+  select(StationCode:comid_gage, gagetype, station_nm:class3_name, SampleID, sampledate, bioindicator, biovalue, asci, csci, csci_percentile, COMID_bio, MP_metric, Power.avg:Period)
+
+# check
+summary(df_final)
 
 ## Seasonality vs. Predict by StreamClass for -------
 

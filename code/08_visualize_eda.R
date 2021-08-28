@@ -19,10 +19,10 @@ df_final <- read_rds("output/07_wavelet_asci_csci_colwell_final.rds")
 df_final %>% distinct(bioindicator, site_id, .keep_all = TRUE) %>% 
   group_by(bioindicator, gagetype) %>% tally() 
 # CSCI ALT = 125, REF=53
-# ASCI ALT = 122
+# ASCI ALT = 122, REF=47
 
 # Get Wavelets
-load("output/06_wavelet_combined_period_power_outputs.rda")
+# load("output/06_wavelet_combined_period_power_outputs.rda")
 # df_wav_max: max power no matter the period
 # df_wav: raw data, all points
 # df_wav_12: max power at 12 months
@@ -54,13 +54,13 @@ refdat <- usgs_flows_ref_trim %>%
 altdat <- usgs_flows_alt_trim %>% 
   filter(site_no %in% unique(df_final$site_id)) 
 
-length(unique(altdat$site_no))
-length(unique(refdat$site_no))
+length(unique(altdat$site_no)) # n=164
+length(unique(refdat$site_no)) # n=67
 
 # MEAN ANN PLOT 12MON by Colwells -------------------------------------------------------
 
 # mean annual
-altdat %>% distinct(site_no) %>% nrow() # unfilt: n=160
+altdat %>% distinct(site_no) %>% nrow() # unfilt: n=164
 
 # Colwell
 (altdat %>% 
@@ -77,7 +77,7 @@ altdat %>% distinct(site_no) %>% nrow() # unfilt: n=160
     #scale_color_viridis(limits=c(0,10)) + # for Power.avg
     scale_color_viridis("Colwell (MP)",limits=c(0,1)) + # for MP
     labs(y="Mean Annual Discharge (cfs)", x="Day of Water Year",
-         subtitle = "Altered Gages [n=160]") +
+         subtitle = "Altered Gages [n=164]") +
     facet_grid(rows = vars(bioindicator), scales = "free_y") -> g1_a)
 
 ggsave(filename = "figures/mean_ann_logflow_alt_csci_asci_12mon_colwells.png", 
@@ -86,7 +86,7 @@ ggsave(filename = "figures/mean_ann_flow_alt_csci_asci_12mon_colwells.png",
        width = 11, height = 8, dpi=300)
 
 # Wavelet
-refdat %>% distinct(site_no) %>% nrow()# n=53
+refdat %>% distinct(site_no) %>% nrow()# n=67
 (refdat %>% 
     group_by(site_no, DOWY) %>% 
     summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
@@ -101,7 +101,7 @@ refdat %>% distinct(site_no) %>% nrow()# n=53
     #scale_color_viridis(limits=c(0,10)) + # for Power.avg
     scale_color_viridis("Colwell (MP)", limits=c(0,1)) + # for MP
     labs(y="Mean Annual Discharge (cfs)", x="Day of Water Year",
-         subtitle = "Ref Gages [n=53]") +
+         subtitle = "Ref Gages [n=67]") +
     facet_grid(rows = vars(bioindicator)) -> g1_b)
 
 
@@ -193,16 +193,37 @@ library(ggpubr)
                comparisons = list(c("REF", "ALT")),
                map_signif_level=TRUE))
 
+## Wavelet: ASCI v Gagetype ------------------------------------------------
+
+(p12_1_asci <- ggplot(data=df_final %>% filter(bioindicator=="ASCI"), 
+                      aes(x=gagetype, y=Power.avg)) + 
+   geom_jitter(data=df_final %>% filter(bioindicator=="ASCI"), 
+               aes(x=gagetype, y=Power.avg), 
+               pch=16, size=2, color="gray40", 
+               show.legend = FALSE, alpha=0.5) +
+   geom_boxplot(data=df_final %>% filter(bioindicator=="ASCI"), 
+                aes(x=gagetype, y=Power.avg, fill=gagetype), 
+                show.legend = FALSE, alpha=0.8) + 
+   labs(y="Interannual Seasonality (Power Avg)", x="",
+        subtitle="ASCI") +
+   scale_y_log10() +
+   theme_classic() +
+   scale_fill_viridis_d(option = "E", direction = -1) +
+   geom_signif(data=df_final %>% filter(bioindicator=="ASCI"),
+               comparisons = list(c("REF", "ALT")),
+               map_signif_level=TRUE))
+
+
 
 ## Wavelet: ASCI vs CSCI ---------------------------------------------------
 
-(p12_1 <- ggplot(data=df_final %>% filter(gagetype=="ALT"), 
+(p12_1 <- ggplot(data=df_final, #%>% filter(gagetype=="ALT"), 
                  aes(x=bioindicator, y=Power.avg)) + 
-    geom_jitter(data=df_final %>% filter(gagetype=="ALT"), 
+    geom_jitter(data=df_final, #%>% filter(gagetype=="ALT"), 
                 aes(x=bioindicator, y=Power.avg), 
                 pch=16, size=2, color="gray40", 
                 show.legend = FALSE, alpha=0.5) +
-    geom_boxplot(data=df_final %>% filter(gagetype=="ALT"), 
+    geom_boxplot(data=df_final, #%>% filter(gagetype=="ALT"), 
                  aes(x=bioindicator, y=Power.avg, fill=bioindicator), 
                  show.legend = FALSE, alpha=0.8) + 
     labs(y="Interannual Seasonality (Power Avg)", x="",
@@ -210,9 +231,10 @@ library(ggpubr)
     scale_y_log10() +
     theme_classic() +
     scale_fill_viridis_d(option = "E", direction = -1) +
-    geom_signif(data = df_final %>% filter(gagetype=="ALT"),
+    geom_signif(data = df_final, #%>% filter(gagetype=="ALT"),
                 comparisons = list(c("ASCI", "CSCI")),
-                map_signif_level=TRUE))
+                map_signif_level=TRUE) +
+   facet_grid(.~gagetype))
 
 
 ## Colwell: CSCI vs Gagetype -----------------------------------------------
@@ -236,10 +258,33 @@ library(ggpubr)
                 comparisons = list(c("REF", "ALT")),
                 map_signif_level=TRUE))
 
+
+## Colwell: ASCI vs Gagetype -----------------------------------------------
+
+# ASCI v gagetype
+(p12_2_asci <- ggplot(data=df_final %>% filter(bioindicator=="ASCI"), 
+                      aes(x=gagetype, y=MP_metric)) + 
+   geom_jitter(data=df_final %>% filter(bioindicator=="ASCI"), 
+               aes(x=gagetype, y=MP_metric), 
+               pch=16, size=2, color="gray40", 
+               show.legend = FALSE, alpha=0.5) +
+   geom_boxplot(data=df_final %>% filter(bioindicator=="ASCI"), 
+                aes(x=gagetype, y=MP_metric, fill=gagetype), 
+                show.legend = FALSE, alpha=0.8) +
+   labs(y="Intra-annual Seasonality (Colwell's M/P)", x="",
+        subtitle="ASCI") +
+   theme_classic() +
+   scale_y_log10() + 
+   scale_fill_viridis_d(option = "E", direction = -1) +
+   geom_signif(data = df_final %>% filter(bioindicator=="ASCI"),
+               comparisons = list(c("REF", "ALT")),
+               map_signif_level=TRUE))
+
+
 ## Colwell: CSCI vs ASCI -----------------------------------------------
 
 # ASCI vs CSCI Colwell
-(p12_2 <- ggplot(data=df_final %>% filter(gagetype=="ALT"), 
+(p12_2 <- ggplot(data=df_final, #%>% filter(gagetype=="ALT"), 
                  aes(x=bioindicator, y=MP_metric)) + 
     geom_jitter(data=df_final, aes(x=bioindicator, y=MP_metric), 
                 pch=16, size=2, color="gray40", 
@@ -251,8 +296,10 @@ library(ggpubr)
     theme_classic() +
     scale_y_log10() + 
     scale_fill_viridis_d(option = "E", direction = -1) +
-    geom_signif(comparisons = list(c("ASCI", "CSCI")),
-                map_signif_level=TRUE))
+    geom_signif(data = df_final, 
+                comparisons = list(c("ASCI", "CSCI")),
+                map_signif_level=TRUE) +
+  facet_grid(.~gagetype))
 
 
 ## Gagetype: CSCI  ------------------------------------------------------
@@ -275,10 +322,35 @@ library(ggpubr)
                 map_signif_level=TRUE))
 
 
+## Gagetype: ASCI  ------------------------------------------------------
+
+(p12_3_asci <- ggplot(data=df_final %>% filter(bioindicator=="ASCI"), 
+                      aes(x=gagetype, y=biovalue)) + 
+   geom_jitter(data=df_final %>% filter(bioindicator=="ASCI"), 
+               aes(x=gagetype, y=biovalue), 
+               pch=16, size=2, color="gray40", 
+               show.legend = FALSE, alpha=0.5) +
+   geom_boxplot(data=df_final %>% filter(bioindicator=="ASCI"), 
+                aes(x=gagetype, y=biovalue, fill=gagetype), 
+                show.legend = FALSE, alpha=0.8) +
+   labs(y="ASCI", x="", subtitle="ASCI") +
+   theme_classic() +
+   scale_y_log10() + 
+   scale_fill_viridis_d(option = "E", direction = -1) +
+   geom_signif(data = df_final %>% filter(bioindicator=="ASCI"), 
+               comparisons = list(c("REF", "ALT")),
+               map_signif_level=TRUE))
+
+
+
 ## Save Boxplots -----------------------------------------------------------
 
 p12_1_csci + p12_2_csci + p12_3_csci
 ggsave(filename = "figures/boxplots_of_12mon_wav_col_csci.png", width = 11, height = 8, dpi=300)
+
+p12_1_asci + p12_2_asci + p12_3_asci
+ggsave(filename = "figures/boxplots_of_12mon_wav_col_asci.png", width = 11, height = 8, dpi=300)
+
 
 p12_1 + p12_2
 ggsave(filename = "figures/boxplots_of_12mon_wav_col_asci_csci.png", width = 11, height = 8, dpi=300)
