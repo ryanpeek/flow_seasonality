@@ -1,0 +1,17 @@
+metric,status_code,status,alteration_type,median_in_iqr,comid
+DS_Dur_WS,0,indeterminate,unknown,TRUE,8933494
+DS_Tim,0,indeterminate,late,FALSE,8933494
+DS_Mag_50,1,likely_unaltered,none_found,TRUE,8933494
+DS_Mag_90,1,likely_unaltered,none_found,TRUE,8933494
+FA_Mag,1,likely_unaltered,none_found,TRUE,8933494
+FA_Tim,1,likely_unaltered,none_found,FALSE,8933494
+SP_Dur,0,indeterminate,unknown,TRUE,8933494
+SP_Mag,1,likely_unaltered,none_found,TRUE,8933494
+SP_Tim,1,likely_unaltered,none_found,TRUE,8933494
+Wet_BFL_Dur,1,likely_unaltered,none_found,TRUE,8933494
+Wet_BFL_Mag_10,1,likely_unaltered,none_found,TRUE,8933494
+Wet_BFL_Mag_50,1,likely_unaltered,none_found,TRUE,8933494
+Wet_Tim,0,indeterminate,unknown,TRUE,8933494
+Peak_10,-1,likely_altered,low,FALSE,8933494
+Peak_2,1,likely_unaltered,none_found,FALSE,8933494
+Peak_5,-1,likely_altered,low,FALSE,8933494

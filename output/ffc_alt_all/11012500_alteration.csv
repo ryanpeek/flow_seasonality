@@ -1,0 +1,9 @@
+metric,status_code,status,alteration_type,median_in_iqr,comid
+FA_Dur,1,likely_unaltered,none_found,TRUE,20326431
+SP_ROC,1,likely_unaltered,none_found,TRUE,20326431
+Peak_Dur_10,1,likely_unaltered,none_found,TRUE,20326431
+Peak_Dur_2,-1,likely_altered,high,FALSE,20326431
+Peak_Dur_5,1,likely_unaltered,none_found,TRUE,20326431
+Peak_Fre_10,1,likely_unaltered,none_found,TRUE,20326431
+Peak_Fre_2,1,likely_unaltered,none_found,FALSE,20326431
+Peak_Fre_5,1,likely_unaltered,none_found,TRUE,20326431

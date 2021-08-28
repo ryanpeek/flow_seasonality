@@ -35,18 +35,27 @@ source("code/f_ffc_collapse.R")
 
 # Data --------------------------------------------------------------------
 
-df_final <- read_rds("output/wavelet_csci_colwell_final.rds")
-df_final %>% distinct(site_id, .keep_all = TRUE) %>% 
-  group_by(gagetype) %>% tally() # ALT = 140, REF=55
+df_final <- read_rds("output/07_wavelet_asci_csci_colwell_final.rds")
+df_final %>% distinct(bioindicator, site_id, .keep_all = TRUE) %>% 
+  group_by(bioindicator, gagetype) %>% tally() 
+# CSCI ALT = 125, REF=53
+# ASCI ALT = 122
 
-load("data/usgs_Q_daily_ref_gages_trim.rda") # usgs_flows_ref
-load("data/usgs_Q_daily_alt_gages_trim.rda") # usgs_flows_alt
+load("data/usgs_Q_daily_ref_gages_trim.rda") # usgs_flows_ref_trim
+load("data/usgs_Q_daily_alt_gages_trim.rda") # usgs_flows_alt_trim
 
-# make a simple list of gage_id & gageIDName
-gages <- df_final %>%
-  distinct(site_id, .keep_all = TRUE) %>%
-  select(site_id, comid, gagetype, station_nm, lat, lon, MP_metric, class3_id, class3_name, CLASS_NAME)
-table(gages$gagetype)
+# make a simple list of gage_id 
+gage_alt_meta <- usgs_flows_alt_trim %>% distinct(site_no, .keep_all=TRUE) %>% 
+  select(site_no,station_nm:flowcnt) # n=517
+gage_ref_meta <- usgs_flows_ref_trim %>% distinct(site_no, .keep_all=TRUE) %>% 
+  select(site_no,station_nm, usgs_lat, usgs_lon, huc8, parm_cd, stat_cd, 
+         ref_yr_start, ref_yr_end, ref_por_range, yr_begin, yr_end, yr_total, 
+         gagetype, parm_cd:flowcnt) # n=221
+
+# bind rows
+gage_metadata <- bind_rows(gage_alt_meta, gage_ref_meta)
+
+gages <- unique(df_final$site_id)
 
 # Filter to CSCI Sites Only -----------------------------------------------
 
@@ -54,19 +63,21 @@ table(gages$gagetype)
 flow_ref <- usgs_flows_ref_trim %>% 
   filter(site_no %in% unique(df_final$site_id)) %>% 
   # add COMID
-  left_join(., df_final %>% select(site_id, comid), by=c("site_no"="site_id")) %>% 
-  rename(flow=Flow)
+  left_join(., df_final %>% select(site_id, comid_gage, bioindicator), by=c("site_no"="site_id")) %>% 
+  rename(flow=Flow) # n=2276366
 
 # ALT
 flow_alt <- usgs_flows_alt_trim %>% 
   filter(site_no %in% unique(df_final$site_id)) %>% 
   # add COMID
-  left_join(., df_final %>% select(site_id, comid), by=c("site_no"="site_id")) %>% 
-  rename(flow=Flow)
+  left_join(., df_final %>% select(site_id, comid_gage, bioindicator), by=c("site_no"="site_id")) %>% 
+  rename(flow=Flow) # n=12293311
 
 # how many gages paired with CSCI?
-flow_ref %>% ungroup() %>% distinct(site_no) %>% tally() # n=55
-flow_alt %>% ungroup() %>% distinct(site_no) %>% tally() # n=140
+flow_ref %>% ungroup() %>% distinct(site_no, bioindicator) %>% 
+  group_by(bioindicator) %>% tally() # n=53
+flow_alt %>% ungroup() %>% distinct(site_no, bioindicator) %>% 
+  group_by(bioindicator) %>% tally() # n=122 ASCI, 125=CSCI
 
 # Testing FFC Function ------------------------------------------------------
 
@@ -132,7 +143,7 @@ gagedata_alt <- flow_alt %>%
 tic() # start time
 ffcs_alt <- map(gagedata_alt, ~ffc_possible(flowseries_df = .x,
                                     ffctoken=ffctoken,
-                                    dirToSave="output/ffc_alt_csci", 
+                                    dirToSave="output/ffc_alt_all", 
                                     save=TRUE))
 toc() # end time
 
@@ -150,7 +161,7 @@ ffcs_alt %>% keep(is.na(.)) %>% length()
 # write_lines(miss_gages_alt, file = glue("output/usgs_ffm_alt_missing_gages_{file_ts}.txt"))
 
 # Save Out: FFC R6 object (only if save=FALSE)
-save(ffcs_alt, file = glue("output/ffc_alt_csci/usgs_ffm_alt_R6_full_{file_ts}.rda"))
+save(ffcs_alt, file = glue("output/ffc_alt_all/usgs_ffm_alt_R6_full_{file_ts}.rda"))
 
 # Combine FFC -------------------------------------------------------------
 
@@ -159,7 +170,7 @@ source("code/f_ffc_collapse.R")
 ## Setup Directory ---------------------------------------------------------
 
 # get type
-type <- "alt_csci" # alt_csci
+type <- "alt_all" # alt_csci
 
 # get dir
 ffc_dir <- glue("output/ffc_{type}/")
@@ -260,13 +271,19 @@ ffc_files <- dir_ls(ffc_dir, type = "file", regexp = "*.csv")
 ffc_combine_alt_ref <- function(datatype, fdir){
   datatype = datatype
   ffc_files = dir_ls(path = fdir, type = "file", regexp = "*.csv")
-  csv_list = ffc_files[grepl(glue("(alt|ref)_csci_{datatype}_run*"), ffc_files)]
+  csv_list_alt = ffc_files[grepl(glue("(alt)_all_{datatype}_run*"), ffc_files)]
+  csv_list_ref = ffc_files[grepl(glue("(ref)_csci_{datatype}_run*"), ffc_files)]
   # read in all
-  df <- purrr::map(csv_list, ~read_csv(.x)) %>%
+  df_alt <- purrr::map(csv_list_alt, ~read_csv(.x)) %>%
     # check and fix char vs. num
     map(~mutate_at(.x, 'gageid', as.character)) %>%
     bind_rows()
-  return(df)
+  df_ref <- purrr::map(csv_list_ref, ~read_csv(.x)) %>%
+    # check and fix char vs. num
+    map(~mutate_at(.x, 'gageid', as.character)) %>%
+    bind_rows()
+  df_all <- bind_rows(df_alt, df_ref)
+  return(df_all)
 }
 
 
@@ -283,7 +300,7 @@ df_ffc %>% distinct(gageid) %>% count()
 table(df_ffc$gageid)
 
 # add gagetype & metadata
-df_ffc_meta <- left_join(df_ffc, gages, by=c("gageid"="site_id", "comid"))
+df_ffc_meta <- left_join(df_ffc, gage_metadata, by=c("gageid"="site_no"))
 
 df_ffc_meta %>% distinct(gageid, .keep_all = TRUE) %>% 
   group_by(gagetype) %>% tally()
