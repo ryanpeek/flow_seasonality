@@ -54,30 +54,34 @@ gage_ref_meta <- usgs_flows_ref_trim %>% distinct(site_no, .keep_all=TRUE) %>%
 
 # bind rows
 gage_metadata <- bind_rows(gage_alt_meta, gage_ref_meta)
-
-gages <- unique(df_final$site_id)
+gagelist <- unique(df_final$site_id)
 
 # Filter to CSCI Sites Only -----------------------------------------------
 
 # REF: filter to filtered CSCI Paired sites
 flow_ref <- usgs_flows_ref_trim %>% 
-  filter(site_no %in% unique(df_final$site_id)) %>% 
+  filter(site_no %in% gagelist) %>% 
   # add COMID
   left_join(., df_final %>% select(site_id, comid_gage, bioindicator), by=c("site_no"="site_id")) %>% 
   rename(flow=Flow) # n=2276366
 
 # ALT
 flow_alt <- usgs_flows_alt_trim %>% 
-  filter(site_no %in% unique(df_final$site_id)) %>% 
+  filter(site_no %in% gagelist) %>% 
   # add COMID
   left_join(., df_final %>% select(site_id, comid_gage, bioindicator), by=c("site_no"="site_id")) %>% 
   rename(flow=Flow) # n=12293311
 
 # how many gages paired with CSCI?
 flow_ref %>% ungroup() %>% distinct(site_no, bioindicator) %>% 
-  group_by(bioindicator) %>% tally() # n=53
+  group_by(bioindicator) %>% tally() # n=47 ASCI, 53 CSCI
 flow_alt %>% ungroup() %>% distinct(site_no, bioindicator) %>% 
-  group_by(bioindicator) %>% tally() # n=122 ASCI, 125=CSCI
+  group_by(bioindicator) %>% tally() # n=126 ASCI, 125=CSCI
+
+flow_ref %>% ungroup() %>% distinct(site_no, gagetype) %>% 
+  group_by(gagetype) %>% tally() # n=67 
+flow_alt %>% ungroup() %>% distinct(site_no, gagetype) %>% 
+  group_by(gagetype) %>% tally() # n=67 
 
 # Testing FFC Function ------------------------------------------------------
 
@@ -111,7 +115,7 @@ gagedata_ref <- flow_ref %>%
 tic() # start time
 ffcs_ref <- map(gagedata_ref, ~ffc_possible(flowseries_df = .x,
                                   ffctoken=ffctoken,
-                                  dirToSave="output/ffc_ref_csci", 
+                                  dirToSave="output/ffc_ref_bio", 
                                   save=TRUE))
 toc() # end time
 # 383.114 sec elapsed
@@ -130,7 +134,7 @@ ffcs_ref %>% keep(is.na(.)) %>% length()
 # write_lines(miss_gages_ref, file = glue("output/usgs_ffm_alt_missing_gages_{file_ts}.txt"))
 
 # SAVE: FFC R6 object (only if save=FALSE)
-save(ffcs_ref, file = glue("output/ffc_ref_csci/usgs_ffm_ref_R6_csci_{file_ts}.rda"))
+save(ffcs_ref, file = glue("output/ffc_ref_bio/usgs_ffm_ref_R6_bio_{file_ts}.rda"))
 
 # ALT: Setup Full Flowseries Data ----------------------------------------------
 
@@ -143,7 +147,7 @@ gagedata_alt <- flow_alt %>%
 tic() # start time
 ffcs_alt <- map(gagedata_alt, ~ffc_possible(flowseries_df = .x,
                                     ffctoken=ffctoken,
-                                    dirToSave="output/ffc_alt_all", 
+                                    dirToSave="output/ffc_alt_bio", 
                                     save=TRUE))
 toc() # end time
 
@@ -161,7 +165,7 @@ ffcs_alt %>% keep(is.na(.)) %>% length()
 # write_lines(miss_gages_alt, file = glue("output/usgs_ffm_alt_missing_gages_{file_ts}.txt"))
 
 # Save Out: FFC R6 object (only if save=FALSE)
-save(ffcs_alt, file = glue("output/ffc_alt_all/usgs_ffm_alt_R6_full_{file_ts}.rda"))
+save(ffcs_alt, file = glue("output/ffc_alt_bio/usgs_ffm_bio_R6_full_{file_ts}.rda"))
 
 # Combine FFC -------------------------------------------------------------
 
@@ -170,11 +174,11 @@ source("code/f_ffc_collapse.R")
 ## Setup Directory ---------------------------------------------------------
 
 # get type
-type <- "alt_all" # alt_csci
+type <- "ref_bio" # alt_csci
 
 # get dir
 ffc_dir <- glue("output/ffc_{type}/")
-ffc_files <- dir_ls(ffc_dir, type = "file", regexp = "*.csv")
+(ffc_files <- dir_ls(ffc_dir, type = "file", regexp = "*.csv"))
 ffc_files
 # create output location:
 fs::dir_create("output/ffc_combined")
@@ -271,8 +275,8 @@ ffc_files <- dir_ls(ffc_dir, type = "file", regexp = "*.csv")
 ffc_combine_alt_ref <- function(datatype, fdir){
   datatype = datatype
   ffc_files = dir_ls(path = fdir, type = "file", regexp = "*.csv")
-  csv_list_alt = ffc_files[grepl(glue("(alt)_all_{datatype}_run*"), ffc_files)]
-  csv_list_ref = ffc_files[grepl(glue("(ref)_csci_{datatype}_run*"), ffc_files)]
+  csv_list_alt = ffc_files[grepl(glue("(alt)_bio_{datatype}_run*"), ffc_files)]
+  csv_list_ref = ffc_files[grepl(glue("(ref)_bio_{datatype}_run*"), ffc_files)]
   # read in all
   df_alt <- purrr::map(csv_list_alt, ~read_csv(.x)) %>%
     # check and fix char vs. num
@@ -306,5 +310,5 @@ df_ffc_meta %>% distinct(gageid, .keep_all = TRUE) %>%
   group_by(gagetype) %>% tally()
 
 # write out
-write_csv(df_ffc_meta, file = glue("output/ffc_meta_combined_{datatype}.csv"))
-write_rds(df_ffc_meta, file = glue("output/ffc_meta_combined_{datatype}.rds"), compress = "gz")
+write_csv(df_ffc_meta, file = glue("output/09_ffc_meta_combined_{datatype}.csv"))
+write_rds(df_ffc_meta, file = glue("output/09_ffc_meta_combined_{datatype}.rds"), compress = "gz")
