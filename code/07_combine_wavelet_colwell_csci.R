@@ -104,7 +104,7 @@ df_final <- bind_rows(df_asci_final %>%
 
 # combine csci/asci col:
 df_final <- df_final %>% mutate(biovalue=coalesce(asci, csci)) %>% 
-  select(StationCode:comid_gage, station_nm:class3_name, sampledate, bioindicator, biovalue, asci, csci, csci_percentile, COMID_algae, COMID_bmi, MP_metric, Power.avg:Period_rnd)
+  select(StationCode:comid_gage, station_nm:class3_name, SampleID, sampledate, bioindicator, biovalue, asci, csci, csci_percentile, COMID_algae, COMID_bmi, MP_metric, Power.avg:Period_rnd)
 
 ## Seasonality vs. Predict by StreamClass for -------
 

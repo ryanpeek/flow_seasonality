@@ -90,16 +90,19 @@ table(df_colwell_all$gagetype, useNA = "ifany")
 # 04: SAVE ------------------------------------------------------------------
 
 # save
-write_rds(df_colwell_all_meta, file = "output/usgs_gages_colwells_metric.rds")
+write_rds(df_colwell_all_meta, file = "output/04_usgs_gages_colwells_metric.rds")
+
+rm(df_alt, df_ref, df_colwell_all, df_colwell_alt, df_colwell_ref, 
+   gage_alt_meta, gage_ref_meta, usgs_flows_alt_trim, usgs_flows_ref_trim)
 
 # 05: READ IN DATA ---------------------------------------------------------
 
-df_colwell_all_meta <- read_rds("output/usgs_gages_colwells_metric.rds")
+df_colwell_all_meta <- read_rds("output/04_usgs_gages_colwells_metric.rds")
 
 # 06: PLOTS -----------------------------------------------------------------
 
 # Histogram
-df_colwell_all %>% ggplot() + geom_histogram(aes(y=MP_metric, fill=gagetype))
+df_colwell_all_meta %>% ggplot() + geom_histogram(aes(y=MP_metric, fill=gagetype))
 
 # Boxplot of ref/alt
 df_colwell_all_meta %>% 
@@ -144,12 +147,12 @@ table(csci_por$CEFF_type, useNA = "ifany") # n=521 alt, n=193 REF
 
 # 07B: IMPORT ASCI ------------------------------------------------------------
 
-asci_trim <- read_rds("https://github.com/ksirving/asci_ffm_2019/blob/master/output_data/06_asci_por_trim_final_dataset.rds?raw=true") %>% st_drop_geometry() %>% 
+asci_trim <- read_rds("https://github.com/ksirving/asci_ffm_2019/blob/master/output_data/02c_selected_final_algae_asci_dat_trim.rds?raw=true") %>% st_drop_geometry() %>% 
   select(StationCode:HUC_12, CEFF_type, 
-         site_id, comid_gage, site_id_nm = station_nm,
+         site_id, comid_gage=comid,
          SampleID:YYYY) %>%  
   distinct(StationCode, SampleID, site_id, .keep_all=TRUE)
-table(asci_trim$CEFF_type)
+table(asci_trim$CEFF_type, useNA = "ifany") # n=303 alt, 102 REF
 
 # 08: JOIN WITH COLWELL AND ASCI/CSCI -----------------------------------------------
 
@@ -172,27 +175,26 @@ asci_colwell <- left_join(asci_trim, df_colwell_all_meta, by=c("site_id"="site_n
   # drop crap gages (canals etc)
   filter(!is.na(gagetype))
 
-  
-table(asci_colwell$gagetype, useNA = "ifany") # n=260
+table(asci_colwell$gagetype, useNA = "ifany") # n=264 alt, 102 ref
 
 # 09: GAM PLOT ---------------------------------------------------------------
 
 # CSCI vs GAGETYPE
-csci_por_colwell %>% 
+(g1 <- csci_por_colwell %>% 
   ggplot() + 
-  geom_point(aes(y=MP_metric, x=csci, fill=gagetype), pch=21, size=2.7, alpha=0.9) +
+  geom_point(aes(y=MP_metric, x=csci, fill=gagetype), pch=21, size=2.7, alpha=0.9, show.legend = FALSE) +
   stat_smooth(aes(y=MP_metric, x=csci, color=gagetype), 
-              method = "gam") +
+              method = "gam", show.legend=FALSE) +
   theme_classic(base_family = "Roboto Condensed") +
   scale_color_viridis_d(option = "B", "Gage Type") +
   scale_fill_viridis_d(option = "A", "Gage Type") +
   labs(y="Intra-annual Seasonality \n(Colwell's M/P)", x="CSCI",
-       caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)")
+       caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)"))
 
 ggsave(filename = "figures/colwells_ref_alt_vs_csci_gam_trend.png", width = 10, height = 8, dpi = 300, units = "in")
 
 # ASCI vs GAGETYPE
-asci_colwell %>% 
+(g2 <- asci_colwell %>% 
   ggplot() + 
   geom_point(aes(y=MP_metric, x=H_ASCI, fill=gagetype), pch=21, size=2.7, alpha=0.9) +
   stat_smooth(aes(y=MP_metric, x=H_ASCI, color=gagetype), 
@@ -201,9 +203,15 @@ asci_colwell %>%
   scale_color_viridis_d(option = "B", "Gage Type") +
   scale_fill_viridis_d(option = "A", "Gage Type") +
   labs(y="Intra-annual Seasonality \n(Colwell's M/P)", x="ASCI",
-       caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)")
+       caption = "Standardized seasonality in relation to overall predictability \nby dividing seasonality (M) by overall predictability \n(the sum of (M) and constancy (C)), as per Tonkin et al. (2017)"))
 
-ggsave(filename = "figures/colwells_alt_vs_asci_gam_trend.png", width = 10, height = 8, dpi = 300, units = "in")
+ggsave(filename = "figures/colwells_ref_alt_vs_asci_gam_trend.png", width = 10, height = 8, dpi = 300, units = "in")
+
+# combined
+library(patchwork)
+g1 + g2
+
+ggsave(filename = "figures/colwells_ref_alt_vs_asci_&_csci_gam_trend.png", width = 10, height = 8, dpi = 300, units = "in")
 
 
 # 10: ADD STREAM CLASSES -----------------------------------------------
@@ -232,19 +240,19 @@ asci_final <- left_join(asci_colwell,
 
 table(asci_final$class3_name, useNA = "ifany")
 
-asci_final %>% st_as_sf(coords=c("usgs_lon", "usgs_lat"), crs=4269, remove=F) %>% mapview(zcol="class3_name", burst=TRUE)
-
-mapview::mapview(asci_final)
-
+# NAs?
+asci_final %>% st_as_sf(coords=c("usgs_lon", "usgs_lat"), crs=4269, remove=F) %>% mapview(zcol="class3_name", burst=TRUE) #+ 
+  #mapview(strm_class_final, zcol="class3_name")
 
 asci_final <- asci_final %>% 
   mutate(class3_name = case_when(
+    site_id %in% c("11048553") ~ "SNOWMELT",
     is.na(class3_name) ~ "RAIN",
     TRUE ~ class3_name
   ))
 
 table(asci_final$gagetype, useNA = "always")
-
+table(asci_final$class3_name, useNA = "always")
 
 # 11: PLOT GAGETYPE BY STREAMCLASS ------------------------------------------
 
