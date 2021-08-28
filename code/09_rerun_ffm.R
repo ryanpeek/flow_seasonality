@@ -291,8 +291,35 @@ ffc_combine_alt_ref <- function(datatype, fdir){
 }
 
 
+## RUN FOR PERCENTILES -----------------------------------------------------
+
 # set the data type:
 datatype <- "ffc_percentiles" # ffc_percentiles or predicted_percentiles
+
+# combine
+df_ffc <- ffc_combine_alt_ref(datatype, fdir = ffc_dir)
+
+# view how many USGS gages
+df_ffc %>% distinct(gageid) %>% count()
+
+# how many records per gage?
+table(df_ffc$gageid)
+
+# add gagetype & metadata
+df_ffc_meta <- left_join(df_ffc, gage_metadata, by=c("gageid"="site_no"))
+
+df_ffc_meta %>% distinct(gageid, .keep_all = TRUE) %>% 
+  group_by(gagetype) %>% tally()
+
+# write out
+write_csv(df_ffc_meta, file = glue("output/09_ffc_meta_combined_{datatype}.csv"))
+write_rds(df_ffc_meta, file = glue("output/09_ffc_meta_combined_{datatype}.rds"), compress = "gz")
+
+
+## RUN FOR PREDICTED PERCENTILES ---------------------------------------------
+
+# set the data type:
+datatype <- "predicted_percentiles" #  predicted_percentiles
 
 # combine
 df_ffc <- ffc_combine_alt_ref(datatype, fdir = ffc_dir)

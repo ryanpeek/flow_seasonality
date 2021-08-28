@@ -53,9 +53,9 @@ table(gages$gagetype)
 # Data --------------------------------------------------------------------
 
 datatype <- "predicted_percentiles" # ffc_percentiles
-df_ffc_pred <- read_rds(glue("output/ffc_meta_combined_{datatype}.rds"))
+df_ffc_pred <- read_rds(glue("output/09_ffc_meta_combined_{datatype}.rds"))
 datatype <- "ffc_percentiles"
-df_ffc_perc <- read_rds(glue("output/ffc_meta_combined_{datatype}.rds"))
+df_ffc_perc <- read_rds(glue("output/09_ffc_meta_combined_{datatype}.rds"))
 
 # Find out What Metrics work across Both ----------------------------------
 
