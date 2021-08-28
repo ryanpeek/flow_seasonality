@@ -18,21 +18,21 @@ mapviewOptions(fgb = FALSE)
 df_csci <- read_rds("output/04_gages_csci_colwells_w_streamclass_metric.rds")
 df_asci <- read_rds("output/04_gages_asci_colwells_w_streamclass_metric.rds")
 
-df_csci %>% st_drop_geometry() %>% 
+df_csci %>%
   distinct(site_id, .keep_all = TRUE) %>% 
   select(gagetype) %>% table() # ALT=125, REF=53
 
 df_asci %>% 
   distinct(site_id, .keep_all = TRUE) %>% 
-  select(gagetype) %>% table() # ALT=122
+  select(gagetype) %>% table() # ALT=126, REF=48
 
 # check streamclass
 table(df_asci$class3_name, useNA="ifany")
 #MIXED     RAIN SNOWMELT 
-# 69      171       20 
+# 88      238       42 
 table(df_csci$class3_name, useNA="ifany")
 #MIXED     RAIN SNOWMELT 
-# 89      405      129 
+# 126      405      95 
 
 # Get Wavelet Data --------------------------------------------------------
 
@@ -46,7 +46,7 @@ load("output/06_wavelet_combined_period_power_outputs.rda")
 
 # Get Gage Metadata -------------------------------------------------------
 
-# get list of potential gages (n=213)
+# get list of potential gages (n=232)
 gagelist <- unique(c(df_csci$site_id, df_asci$site_id))
 
 # Get GAGE metadata
@@ -57,7 +57,7 @@ gages_meta <- bind_rows(usgs_daily_alt, usgs_daily_ref) %>%
   filter(site_id %in% gagelist)
 rm(usgs_daily_alt, usgs_daily_ref)
 
-table(gages_meta$gagetype) # ALT 160, REF 53
+table(gages_meta$gagetype) # ALT 164, REF 68
 
 # Join Colwell with Wavelet -----------------------------------------------
 
@@ -68,7 +68,7 @@ df_csci_final <- left_join(df_csci, df_wav_12, by="site_id") %>%
   rename(gagetype=gagetype.y)
 
 # double check 
-df_csci_final %>% st_drop_geometry() %>% 
+df_csci_final %>% 
   distinct(site_id, .keep_all=TRUE) %>% 
   select(gagetype) %>% table(useNA = "always")
 # matches!!
@@ -77,13 +77,14 @@ df_csci_final %>% st_drop_geometry() %>%
 df_asci_final <- left_join(df_asci, df_wav_12, by="site_id") %>%
   ungroup() %>% 
   select(-gagetype.x) %>% 
-  rename(gagetype=gagetype.y)
+  rename(gagetype=gagetype.y) %>% 
+  filter(!is.na(gagetype))
 
 # double check 
 df_asci_final %>% 
   distinct(site_id, .keep_all=TRUE) %>% 
   select(gagetype) %>% table(useNA = "always")
-# matches!!
+# drop one (126, 47 ref)
 
 
 # COMBINE DATASETS --------------------------------------------------------
@@ -91,8 +92,8 @@ df_asci_final %>%
 janitor::compare_df_cols(df_asci_final, df_csci_final)
 
 df_final <- bind_rows(df_asci_final %>% 
-                        select(-c(site_id_nm, YYYY, class3_id, CEFF_type)) %>% 
-                        rename(latitude=Latitude, longitude=Longitude,
+                        select(-c(YYYY, class3_id, CEFF_type)) %>% 
+                        rename(
                                sampledate=SampleDate, asci=H_ASCI) %>% 
                         mutate(bioindicator="ASCI"), 
                       df_csci_final %>% st_drop_geometry() %>%  
