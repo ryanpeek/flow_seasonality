@@ -59,39 +59,74 @@ df_ffc_perc <- read_rds(glue("output/09_ffc_meta_combined_{datatype}.rds"))
 
 # Find out What Metrics work across Both ----------------------------------
 
-# Metrics that Break (give NA)
+# Metrics that had NAs
 df_ffc_perc %>% filter(is.na(p50)) %>% select(metric) %>% distinct()
-# FA_Dur   
-# FA_Mag   
-# FA_Tim  
-# DS_Dur_WS
-# DS_Mag_50
-# DS_Mag_90
+# DS_Dur_WS     
+# DS_Tim        
+# DS_Mag_50     
+# DS_Mag_90     
+# FA_Dur        
+# FA_Mag        
+# FA_Tim        
+# SP_ROC        
+# SP_Dur        
+# SP_Mag        
+# SP_Tim        
+# Wet_BFL_Dur   
+# Wet_BFL_Mag_10
+# Wet_BFL_Mag_50
+# Wet_Tim    
 
+# count missing per metric
+df_ffc_perc %>% filter(is.na(p50)) %>% group_by(metric) %>% tally()
+
+# count non-missing per metric
+df_ffc_perc %>% filter(!is.na(p50)) %>% group_by(metric) %>% tally()
+
+# no missing in preds (as should be the case)
 df_ffc_pred %>% filter(is.na(p50)) %>% select(metric) %>% distinct() # zero
 
 # Gages that didn't work:
 df_ffc_perc %>% filter(is.na(p50)) %>% select(gageid, gagetype) %>% distinct()
-# ALL are ALT
-# 103087889
-# 11042631
-# 11042900
-# 11046360
-# 11316605
 
-# predicted?
-df_ffc_pred %>% filter(is.na(p50)) %>% select(gageid, gagetype) %>% distinct() # 0
+# 9 gages; should prob drop 7 they are intermittent at best and canals otherwise
+# 103087885 ALT  Ck diversion below dam 
+# 103087889 ALT  dry 
+# 103087891 ALT  dry
+# 103087892 ALT  dry
+# 11042631  ALT  dry creek
+# 11042900  ALT  paved canal
+# 11046360  ALT  dry creek
+
+# keep these
+# 11316605  ALT  hydropeaking highly regulated Tiger Ck below regulator res
+# 10308783  REF  natural flow but many gaps in dataset
+
+# drop all these?
+to_drop <- c("103087885", "103087889", "103087891", "103087892", 
+             "11042631", "11042900", "11046360")
+
+# count metrics by gage type
+df_ffc_perc %>% filter(is.na(p50)) %>% select(gageid, gagetype, metric) %>% 
+  group_by(metric, gagetype) %>% tally() %>% arrange(gagetype)
+
+# what about if we drop gages above: # good! only final 2 gages above
+df_ffc_perc %>% filter(!gageid %in% to_drop) %>% 
+  filter(is.na(p50)) %>% 
+  select(gageid, gagetype, metric) %>% 
+  group_by(metric, gagetype) %>% tally() %>% arrange(gagetype)
+
+# predicted w na = 0
+df_ffc_pred %>% filter(is.na(p50)) %>% group_by(metric) %>% tally()
 df_ffc_pred %>% distinct(gageid, .keep_all=TRUE) %>% group_by(gagetype) %>% tally()
-# matches 160 ALT, 55 REF
+# matches 164 ALT, 67 REF
 
-# not all metrics have values? (should be 193, some are 170)
+# not all metrics have values? (should be 229, some are 194)
 df_ffc_pred %>% group_by(metric) %>% tally() %>% View()
 
-df_ffc_pred %>% filter(!is.na(p50)) %>% group_by(metric) %>% tally() %>% View()
-
-# get metrics that didn't work
+# get 8 metrics that didn't work
 df_ffc_pred %>% filter(!is.na(p50)) %>% group_by(metric) %>% tally() %>% 
-  arrange(n) %>% filter(n<193) %>% pull(metric)
+  arrange(n) %>% filter(n<195) %>% pull(metric)
 
 # list of metrics that didn't/couldn't get calculated for everything
 missing_from_preds <- c("FA_Dur","Peak_Dur_10","Peak_Dur_2","Peak_Dur_5",
@@ -107,34 +142,38 @@ unique(df_ffc_perc$metric)[!unique(df_ffc_perc$metric) %in% unique(df_ffc_pred$m
 
 # still have Peak Timing Metrics: "Peak_Tim_10" "Peak_Tim_2"  "Peak_Tim_5" in the obs percentiles
 
+# gages?
+unique(df_ffc_perc$gageid)[unique(df_ffc_perc$gageid) %in% unique(df_ffc_pred$gageid)]
+
 # Select and Join ---------------------------------------------------------
 
 # join the observed percentiles to predicted and find gages that are missing (or have missing data)
 
 df_comb <- df_ffc_perc %>% select(p50, metric:usgs_lon, gagetype) %>% 
+  filter(!gageid %in% to_drop) %>% 
   filter(!metric %in% c("Peak_Tim_10", "Peak_Tim_2", "Peak_Tim_5")) %>% 
   rename(p50_obs=p50) %>% 
-  left_join(., df_ffc_pred %>% select(p50, metric, gageid, gagetype), by=c("metric", "gageid")) %>% 
+  left_join(., df_ffc_pred %>% select(p50, metric, gageid, gagetype), by=c("metric", "gageid", "gagetype")) %>% 
   rename(p50_pred=p50) %>% 
-  relocate(p50_pred, .after=p50_obs) %>% 
-  mutate(gagetype = coalesce(gagetype.x, gagetype.y)) %>% select(-gagetype.x, -gagetype.y)
+  relocate(p50_pred, .after=p50_obs) #%>% 
+  #mutate(gagetype = coalesce(gagetype.x, gagetype.y)) %>% select(-gagetype.x, -gagetype.y)
   
 # list of gages that are missing predicted metrics
 df_comb %>% filter(is.na(p50_pred)) %>% 
   group_by(gageid) %>% tally() %>% 
-  arrange(n)# n=25 gages w 8, n=2 with 16, and 32 with all NAs
+  arrange(n)# n=34 gages, 32 w/ 8 missing, n=2 w 16
 
 # map these gages
 df_comb %>% filter(is.na(p50_pred)) %>%
-  #filter(metric == "DS_Dur_WS") %>%
+  #filter(metric == "SP_ROC") %>%
   filter(metric == "FA_Dur") %>% 
   #group_by(metric) %>% tally() # 2 gages didn't work for anything, 25 didn't work for subset of metrics
   st_as_sf(., coords=c("usgs_lon","usgs_lat"), crs=4326, remove=FALSE) %>%
   mapview(zcol="gagetype")  # gages 11013000 and 11012500 probably should be dropped
 
-# all over! (n=48 ALT, n=10 REF)
+# all over! (n=20 ALT, n=12 REF)
 df_comb %>% filter(is.na(p50_pred)) %>% 
-  filter(metric == "FA_Dur") %>% 
+  filter(metric == "SP_ROC") %>% 
   group_by(gagetype) %>% distinct() %>% tally()
 
 # get list of gages
@@ -155,19 +194,19 @@ df_comb_final <- df_comb %>%
   filter(!metric %in% missing_from_preds) # drop metrics with NAs
 
 summary(df_comb_final)
-# 4 additional gages have NAs for only a few metrics (all DS and FA metrics)
 
 # how many gages?
 df_comb_final %>% distinct(gageid, .keep_all = TRUE) %>% 
   group_by(gagetype) %>% tally()
 
-# ALT        158
-# REF         55
+# ALT        155
+# REF         67
 
 # how many metrics?
 df_comb_final %>% distinct(metric, gageid, .keep_all = TRUE) %>% 
-  group_by(gageid) %>% tally() # 16 metrics, 213 gages
+  group_by(gageid) %>% tally() # 16 metrics, 222 gages
 
+# get list of distinct metrics that we are using
 df_comb_final %>% distinct(metric, .keep_all = TRUE) %>% 
   group_by(metric) %>% 
   tally() %>% 
@@ -179,9 +218,11 @@ df_comb_final %>% distinct(metric, .keep_all = TRUE) %>%
 # "Wet_Tim"
 
 # get list of gages with NAs
-df_comb_final %>% filter(is.na(p50_pred)) %>% group_by(metric, gageid) %>% tally() %>% pull(gageid) %>% unique()
+df_comb_final %>% filter(is.na(p50_pred)) %>% 
+  group_by(metric, gageid) %>% tally() %>% 
+  pull(gageid) %>% unique() # should be zero!!
 
-# how many unique site pairs: (N=883)
+# how many unique site pairs: (N=883, ASCI=365, CSCI=623)
 df_final %>% group_by(bioindicator, site_id, SampleID) %>% tally() %>% 
   group_by(bioindicator) %>% tally()
 
@@ -192,5 +233,5 @@ df_ffc_final <- inner_join(df_comb_final, df_final %>% select(-c(usgs_lat, usgs_
 summary(df_ffc_final)
 
 # save out
-write_rds(df_ffc_final, file="output/ffc_filtered_final_combined.rds")
+write_rds(df_ffc_final, file="output/10_ffc_filtered_final_combined.rds")
 
