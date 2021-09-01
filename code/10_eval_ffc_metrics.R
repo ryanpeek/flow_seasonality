@@ -282,15 +282,13 @@ bio_ffm_rev <- bind_rows(asci_ffm, csci_ffm) %>%
 
 # double check
 bio_ffm_rev %>% 
-  filter(bioindicator=="CSCI") %>% 
+  filter(bioindicator=="ASCI") %>% 
   distinct(StationCode, gageid, biovalue, .keep_all=TRUE) %>% 
   group_by(StationCode, gageid) %>% 
   tally() %>% 
   arrange(desc(n)) %>% #View()
   #nrow() # 364 unique!
   filter(n>1) %>% nrow() # 0 dups!
-
-
 
 # save out
 write_rds(bio_ffm_rev, file="output/10_ffc_filtered_final_combined_rev.rds")
