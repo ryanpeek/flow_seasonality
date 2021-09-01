@@ -232,6 +232,54 @@ df_ffc_final <- inner_join(df_comb_final, df_final %>% select(-c(usgs_lat, usgs_
 
 summary(df_ffc_final)
 
+
+# Deal with CSCI Duplicates -----------------------------------------------
+
+# calc records by StationCode (how many mult years)
+df_ffc_final %>%
+  filter(bioindicator=="CSCI") %>% 
+  distinct(StationCode, gageid, SampleID, .keep_all=TRUE) %>% 
+  group_by(StationCode, gageid) %>% 
+  tally() %>% 
+  arrange(desc(n)) %>% 
+  filter(n>1) -> csci_sites_to_combine # CSCI n= 147 sites w dups
+
+csci_med <- df_ffc_final %>% 
+  filter(bioindicator=="CSCI") %>%
+  select(-c(p50_obs:metric, result_type, HUC_12:CLASS_NAME)) %>% 
+  distinct(.keep_all=TRUE) %>% 
+  inner_join(., csci_sites_to_combine) %>% 
+  group_by(StationCode, gageid) %>% 
+  summarize(csci_med = median(csci))
+
+csci_ffm <- df_ffc_final %>% 
+  filter(bioindicator=="CSCI") %>%
+  left_join(., csci_med) %>% 
+  relocate(csci_med, .after="csci") %>% 
+  #clean up and reset bioindicator value
+  mutate(csci2 = case_when(
+    is.na(csci_med) ~ csci,
+    TRUE ~ csci_med), .after="csci") %>% 
+  mutate(biovalue = csci2) %>% 
+  select(-csci2)
+
+# double check?
+csci_ffm %>% 
+  filter(bioindicator=="CSCI") %>% 
+  distinct(StationCode, gageid, biovalue, .keep_all=TRUE) %>% 
+  group_by(StationCode, gageid) %>% 
+  tally() %>% 
+  arrange(desc(n)) %>% #View()
+  #nrow() # 364 unique!
+  filter(n>1) %>% nrow() # 0 dups!
+
+# rebind and save dataset
+asci_ffm <- df_ffc_final %>% 
+  filter(bioindicator == "ASCI")
+
+bio_ffm_rev <- bind_rows(asci_ffm, csci_ffm) %>% 
+  relocate(csci_med, .after="csci")
+
 # save out
-write_rds(df_ffc_final, file="output/10_ffc_filtered_final_combined.rds")
+write_rds(df_ffc_final, file="output/10_ffc_filtered_final_combined_rev.rds")
 
