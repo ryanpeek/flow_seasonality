@@ -15,13 +15,13 @@ mapviewOptions(fgb = FALSE)
 # Data --------------------------------------------------------------------
 
 # get combined data w FFC p50
-df_ffc <- read_rds("output/ffc_filtered_final_combined.rds")
+df_ffc <- read_rds("output/10_ffc_filtered_final_combined_rev.rds")
 
 # get all wavelet data
-load("output/wavelet_combined_period_power_outputs.rda")
+load("output/06_wavelet_combined_period_power_outputs.rda")
 
 # csci
-df_csci <- read_rds("output/wavelet_csci_colwell_final.rds")
+df_csci <- read_rds("output/07_wavelet_asci_csci_colwell_final.rds")
 
 # get 12 mon wavelet
 df_wav_12 <- df_wav_12 %>% 
@@ -49,7 +49,7 @@ length(unique(refdat$site_no)) # n=55
 altdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_csci[,c("site_id", "csci", "mmi", "MP_metric")], by=c("site_no"="site_id")) %>%
+  left_join(., df_csci[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
   left_join(., df_wav_12, by=c("site_no"="site_id")) %>% 
   #filter(site_no %in% unique(altdat$site_no)[1:12]) %>% 
   #filter(site_no %in% unique(altdat$site_no)[13:24]) %>%
@@ -90,24 +90,55 @@ gages_to_drop_alt <- c("11216400", "11404100")
 refdat %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_csci[,c("site_id", "csci", "mmi", "MP_metric")], by=c("site_no"="site_id")) %>%
+  left_join(., df_csci[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
   left_join(., df_wav_12, by=c("site_no"="site_id")) %>%
   #filter(site_no %in% unique(refdat$site_no)[1:20]) %>%
   #filter(site_no %in% unique(refdat$site_no)[21:40]) %>%
-  filter(site_no %in% unique(refdat$site_no)[41:55]) %>%
+  #filter(site_no %in% unique(refdat$site_no)[41:55]) %>%
   ggplot() + 
   theme_bw() +
   # switch color: Power.avg or MP_Metric
   #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) + 
   geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=MP_metric)) +
   #scale_color_viridis(limits=c(0,10)) + # for Power.avg
-  scale_color_viridis(limits=c(0,1)) + # for MP
-  facet_wrap(.~site_no, scales = "free")
+  scale_color_viridis(limits=c(0,1)) #+ # for MP
+  #facet_wrap(.~site_no, scales = "free")
 
 #ggsave(filename = "figures/hydro_ref_mean_daily_flow_1_20.png", width = 11, height = 8.5, dpi=300)
 #ggsave(filename = "figures/hydro_ref_mean_daily_flow_21-40.png", width = 11, height = 8.5, dpi=300)
 ggsave(filename = "figures/hydro_ref_mean_daily_flow_41-55.png", width = 11, height = 8.5, dpi=300)
 
+
+# REF: Daily Flow Plots ---------------------------------------------------
+
+# plot REF
+refdat %>% 
+  left_join(., df_csci[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>% 
+  #filter(site_no %in% unique(refdat$site_no)[31:40]) %>%
+  # calc quantiles and filter?
+  filter(MP_metric < quantile(MP_metric, na.rm=TRUE, 0.05)) %>% 
+  filter(site_no %in% unique(.$site_no)[1:5]) %>% 
+  ggplot() + 
+  theme_bw() +
+  #geom_line(aes(x=date, y=Flow, group=site_no, color=MP_metric)) +
+  geom_line(aes(x=date, y=log(Flow), group=site_no, color=MP_metric)) +
+  scale_color_viridis(limits=c(0,1)) +
+  facet_grid(site_no~., scales = "free")
+
+#ggsave(filename = "figures/hydro_ref_mean_daily_flow_1_20.png", width = 11, height = 8.5, dpi=300)
+#ggsave(filename = "figures/hydro_ref_mean_daily_flow_21-40.png", width = 11, height = 8.5, dpi=300)
+ggsave(filename = "figures/hydro_ref_mean_daily_flow_41-55.png", width = 11, height = 8.5, dpi=300)
+
+
+# MAP BY SEASONALITY ------------------------------------------------------
+
+refdat %>% 
+  distinct(site_no, .keep_all=TRUE) %>% 
+  left_join(., df_csci[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
+  st_as_sf(coords=c("usgs_lon","usgs_lat"), crs=4326, remove=F) %>% 
+  distinct(site_no, .keep_all=TRUE) %>% 
+  filter(MP_metric > quantile(MP_metric, na.rm=TRUE, 0.90)) %>% 
+  mapview(zcol="MP_metric", cex=5, at = seq(0, 1, 0.1), layer.name = "Seasonality")
 
 # STREAM CLASS SNOWMELT: Filter and Plot ------------------------------------------
 
