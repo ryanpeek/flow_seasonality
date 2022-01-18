@@ -73,7 +73,7 @@ altdat %>% distinct(site_no) %>% nrow() # unfilt: n=164
     theme_classic() +
     # switch color: Power.avg or MP_Metric
     #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) + 
-    geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=MP_metric)) +
+    geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=MP_metric)) +
     #scale_color_viridis(limits=c(0,10)) + # for Power.avg
     scale_color_viridis("Colwell (MP)",limits=c(0,1)) + # for MP
     labs(y="Mean Annual Discharge (cfs)", x="Day of Water Year",
@@ -115,6 +115,9 @@ ggsave(filename = "figures/mean_ann_logflow_alt_ref_12mon_colwells.png",
        width = 11, height = 8, dpi=300)
 
 
+
+
+
 ## now by wavelet -------------------------------------------
 # mean annual
 # Colwell
@@ -128,7 +131,7 @@ ggsave(filename = "figures/mean_ann_logflow_alt_ref_12mon_colwells.png",
    theme_classic() +
    # switch color: Power.avg or MP_Metric
    #geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=Power.avg)) + 
-   geom_line(aes(x=DOWY, y=meanFlow, group=site_no, color=Power.avg)) +
+   geom_line(aes(x=DOWY, y=log(meanFlow), group=site_no, color=Power.avg)) +
    scale_color_viridis("Wavelet \nPower",limits=c(0,15)) + # for Power.avg
    labs(y="Mean Annual Discharge (cfs)", x="Day of Water Year",
         subtitle = "Altered Gages [n=160], 12 month peak") +
@@ -183,7 +186,7 @@ library(ggpubr)
                show.legend = FALSE, alpha=0.5) +
    geom_boxplot(data=df_final %>% filter(bioindicator=="CSCI"), 
                 aes(x=gagetype, y=Power.avg, fill=gagetype), 
-                show.legend = FALSE, alpha=0.8) + 
+                show.legend = FALSE, alpha=0.8, notch = TRUE) + 
    labs(y="Interannual Seasonality (Power Avg)", x="",
         subtitle="CSCI") +
    scale_y_log10() +
@@ -203,7 +206,7 @@ library(ggpubr)
                show.legend = FALSE, alpha=0.5) +
    geom_boxplot(data=df_final %>% filter(bioindicator=="ASCI"), 
                 aes(x=gagetype, y=Power.avg, fill=gagetype), 
-                show.legend = FALSE, alpha=0.8) + 
+                show.legend = FALSE, alpha=0.8, notch = TRUE) + 
    labs(y="Interannual Seasonality (Power Avg)", x="",
         subtitle="ASCI") +
    scale_y_log10() +
@@ -225,7 +228,7 @@ library(ggpubr)
                 show.legend = FALSE, alpha=0.5) +
     geom_boxplot(data=df_final, #%>% filter(gagetype=="ALT"), 
                  aes(x=bioindicator, y=Power.avg, fill=bioindicator), 
-                 show.legend = FALSE, alpha=0.8) + 
+                 show.legend = FALSE, alpha=0.8, notch = TRUE) + 
     labs(y="Interannual Seasonality (Power Avg)", x="",
          subtitle="ASCI vs. CSCI") +
     scale_y_log10() +
@@ -248,7 +251,7 @@ library(ggpubr)
                 show.legend = FALSE, alpha=0.5) +
     geom_boxplot(data=df_final %>% filter(bioindicator=="CSCI"), 
                  aes(x=gagetype, y=MP_metric, fill=gagetype), 
-                 show.legend = FALSE, alpha=0.8) +
+                 show.legend = FALSE, alpha=0.8, notch = TRUE) +
     labs(y="Intra-annual Seasonality (Colwell's M/P)", x="",
          subtitle="CSCI") +
     theme_classic() +

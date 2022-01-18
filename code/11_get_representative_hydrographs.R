@@ -150,7 +150,7 @@ refdat %>%
   filter(site_no %in% ref_snow$site_id) %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_csci[,c("site_id", "csci", "mmi", "MP_metric")], by=c("site_no"="site_id")) %>%
+  left_join(., df_csci[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
   left_join(., df_wav_12, by=c("site_no"="site_id")) %>%
   ggplot() + 
   theme_bw() +
@@ -178,7 +178,7 @@ altdat %>%
   filter(site_no %in% alt_snow$site_id) %>% 
   group_by(site_no, DOWY) %>% 
   summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-  left_join(., df_csci[,c("site_id", "csci", "mmi", "MP_metric")], by=c("site_no"="site_id")) %>%
+  left_join(., df_csci[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
   left_join(., df_wav_12, by=c("site_no"="site_id")) %>%
   ggplot() + 
   theme_bw() +
@@ -209,7 +209,7 @@ df_csci %>%
     filter(site_no %in% ref_mixed$site_id) %>% 
     group_by(site_no, DOWY) %>% 
     summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-    left_join(., df_csci[,c("site_id", "csci", "mmi", "MP_metric")], by=c("site_no"="site_id")) %>%
+    left_join(., df_csci[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
     left_join(., df_wav_12, by=c("site_no"="site_id")) %>%
     ggplot() + 
     theme_bw() +
@@ -236,7 +236,7 @@ df_csci %>%
     filter(site_no %in% alt_snow$site_id) %>% 
     group_by(site_no, DOWY) %>% 
     summarize(meanFlow = mean(Flow, na.rm=TRUE)) %>%
-    left_join(., df_csci[,c("site_id", "csci", "mmi", "MP_metric")], by=c("site_no"="site_id")) %>%
+    left_join(., df_csci[,c("site_id", "csci", "MP_metric")], by=c("site_no"="site_id")) %>%
     left_join(., df_wav_12, by=c("site_no"="site_id")) %>%
     ggplot() + 
     theme_bw() +
